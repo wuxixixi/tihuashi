@@ -26,7 +26,7 @@ function App() {
 
     try {
       console.log('开始上传图片...')
-      const res = await fetch('/api/upload', {
+      const res = await fetch('http://localhost:3001/api/upload', {
         method: 'POST',
         body: formData
       })
@@ -51,7 +51,7 @@ function App() {
     setAnalysis('')
     try {
       console.log('开始分析图片:', path)
-      const res = await fetch('/api/analyze', {
+      const res = await fetch('http://localhost:3001/api/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ imagePath: path })
@@ -74,7 +74,7 @@ function App() {
     if (!analysis) return
     setPoemLoading(true)
     try {
-      const res = await fetch('/api/poem', {
+      const res = await fetch('http://localhost:3001/api/poem', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ analysis, userFeeling: feeling, style })
@@ -92,7 +92,7 @@ function App() {
 
   const saveRecord = async (poemText) => {
     try {
-      await fetch('/api/save', {
+      await fetch('http://localhost:3001/api/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -111,7 +111,7 @@ function App() {
 
   const loadHistory = async () => {
     try {
-      const res = await fetch('/api/history')
+      const res = await fetch('http://localhost:3001/api/history')
       const data = await res.json()
       if (data.success) {
         setHistory(data.history)
@@ -123,7 +123,7 @@ function App() {
 
   const deleteHistory = async (id) => {
     try {
-      await fetch(`/api/history/${id}`, { method: 'DELETE' })
+      await fetch(`http://localhost:3001/api/history/${id}`, { method: 'DELETE' })
       loadHistory()
     } catch (err) {
       console.error('删除失败', err)
