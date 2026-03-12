@@ -164,9 +164,23 @@ body {
 
 .style-select {
   display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: 12px;
   margin: 15px 0;
+}
+
+.style-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.style-group-label {
+  font-weight: 600;
+  color: var(--primary);
+  min-width: 2em;
+  margin-right: 4px;
 }
 
 .style-btn {
@@ -182,6 +196,15 @@ body {
   background: var(--primary);
   color: white;
   border-color: var(--primary);
+}
+
+.poem-title {
+  font-family: 'Ma Shan Zheng', cursive;
+  font-size: 1.5rem;
+  text-align: center;
+  color: var(--primary);
+  margin-bottom: 12px;
+  font-weight: 600;
 }
 
 .poem-display {

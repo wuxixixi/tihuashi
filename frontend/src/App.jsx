@@ -6,9 +6,14 @@ function App() {
   const [analysis, setAnalysis] = useState('')
   const [feeling, setFeeling] = useState('')
   const [poem, setPoem] = useState('')
+  const [poemTitle, setPoemTitle] = useState('')
   const [loading, setLoading] = useState(false)
   const [poemLoading, setPoemLoading] = useState(false)
   const [style, setStyle] = useState('')
+  const poemStyles = {
+    诗: ['五言绝句', '七言绝句', '五言律诗', '七言律诗', '古体诗'],
+    词: ['婉约', '豪放', '田园', '边塞']
+  }
   const [history, setHistory] = useState([])
   const [activeTab, setActiveTab] = useState('create')
   const fileInputRef = useRef(null)
@@ -26,12 +31,14 @@ function App() {
 
     try {
       console.log('开始上传图片...')
-      const res = await fetch('/api/upload', {
+      const res = await fetch('http://localhost:3001/api/upload', {
         method: 'POST',
         body: formData
       })
-      const data = await res.json()
-      console.log('上传结果:', data)
+      console.log('响应状态:', res.status)
+      const text = await res.text()
+      console.log('响应内容:', text)
+      const data = JSON.parse(text)
       if (data.success) {
         setImage(data.url)
         setImagePath(data.fullPath)
@@ -51,7 +58,7 @@ function App() {
     setAnalysis('')
     try {
       console.log('开始分析图片:', path)
-      const res = await fetch('/api/analyze', {
+      const res = await fetch('http://localhost:3001/api/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ imagePath: path })
@@ -74,7 +81,7 @@ function App() {
     if (!analysis) return
     setPoemLoading(true)
     try {
-      const res = await fetch('/api/poem', {
+      const res = await fetch('http://localhost:3001/api/poem', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ analysis, userFeeling: feeling, style })
@@ -82,7 +89,8 @@ function App() {
       const data = await res.json()
       if (data.success) {
         setPoem(data.poem)
-        saveRecord(data.poem)
+        setPoemTitle(data.title || '')
+        saveRecord(data.title, data.poem)
       }
     } catch (err) {
       alert('创作失败')
@@ -90,9 +98,9 @@ function App() {
     setPoemLoading(false)
   }
 
-  const saveRecord = async (poemText) => {
+  const saveRecord = async (title, poemText) => {
     try {
-      await fetch('/api/save', {
+      await fetch('http://localhost:3001/api/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -100,7 +108,7 @@ function App() {
           analysis,
           userFeeling: feeling,
           poem: poemText,
-          title: analysis?.slice(0, 20) || '无题'
+          title: title || poemTitle || analysis?.slice(0, 20) || '无题'
         })
       })
       loadHistory()
@@ -111,7 +119,7 @@ function App() {
 
   const loadHistory = async () => {
     try {
-      const res = await fetch('/api/history')
+      const res = await fetch('http://localhost:3001/api/history')
       const data = await res.json()
       if (data.success) {
         setHistory(data.history)
@@ -123,7 +131,7 @@ function App() {
 
   const deleteHistory = async (id) => {
     try {
-      await fetch(`/api/history/${id}`, { method: 'DELETE' })
+      await fetch(`http://localhost:3001/api/history/${id}`, { method: 'DELETE' })
       loadHistory()
     } catch (err) {
       console.error('删除失败', err)
@@ -223,14 +231,23 @@ function App() {
             <div className="result-card">
               <h3>✍️ 诗词风格</h3>
               <div className="style-select">
-                {['豪放', '婉约', '田园', '边塞'].map(s => (
-                  <button
-                    key={s}
-                    className={`style-btn ${style === s ? 'active' : ''}`}
-                    onClick={() => setStyle(s)}
-                  >
-                    {s}
-                  </button>
+                {Object.entries(poemStyles).map(([category, list]) => (
+                  <div key={category} className="style-group">
+                    <span className="style-group-label">{category}</span>
+                    {list.map(s => {
+                      const value = `${category}-${s}`
+                      return (
+                        <button
+                          key={value}
+                          type="button"
+                          className={`style-btn ${style === value ? 'active' : ''}`}
+                          onClick={() => setStyle(value)}
+                        >
+                          {s}
+                        </button>
+                      )
+                    })}
+                  </div>
                 ))}
               </div>
             </div>
@@ -250,9 +267,10 @@ function App() {
               {poemLoading ? '创作中...' : '为画题诗'}
             </button>
 
-            {poem && (
+            {(poem || poemTitle) && (
               <div className="result-card" style={{ marginTop: '20px' }}>
                 <h3>📜 题诗</h3>
+                {poemTitle && <div className="poem-title">{poemTitle}</div>}
                 <div className="poem-display">{poem}</div>
               </div>
             )}

@@ -57,10 +57,15 @@ const DMX_CONFIG = {
   model: 'gpt-5-mini'
 };
 
-// 生成鉴权 Header (讯飞 WSSE 鉴权) - 已弃用
-// function generateAuthHeader() { ... }
+// 多模态模型 qwen3-omni-flash（用于画作赏析，支持图文输入）
+// 文档：https://doc.dmxapi.cn/qwen3-omni-flash.html
+const OMNI_CONFIG = {
+  apiKey: DMX_CONFIG.apiKey,
+  responsesUrl: `${DMX_CONFIG.baseUrl}/responses`,
+  model: 'qwen3-omni-flash-all'
+};
 
-// 调用 DMXAPI 大模型
+// 调用 DMXAPI 大模型（文本对话，用于题诗等）
 async function callSparkAI(messages) {
   try {
     const url = `${DMX_CONFIG.baseUrl}/chat/completions`;
@@ -76,11 +81,8 @@ async function callSparkAI(messages) {
     };
 
     console.log('DMXAPI Request URL:', url);
-    console.log('DMXAPI Request Body:', JSON.stringify(payload, null, 2));
-
     const response = await axios.post(url, payload, { headers });
-
-    console.log('DMXAPI Response:', JSON.stringify(response.data, null, 2));
+    console.log('DMXAPI Response:', response.data?.choices?.[0]?.message ? 'OK' : response.data);
     return response.data;
   } catch (error) {
     console.error('DMXAPI 调用失败:', error.response?.data || error.message);
@@ -88,8 +90,87 @@ async function callSparkAI(messages) {
   }
 }
 
-// 历史记录存储文件
-const HISTORY_FILE = path.join(__dirname, 'history.json');
+/**
+ * 调用 qwen3-omni-flash 多模态模型（文+图 -> 文），仅支持流式输出
+ * 文档要求 stream 必须为 true
+ */
+async function callQwenOmniImageToText(imageDataUrl, textPrompt) {
+  const url = OMNI_CONFIG.responsesUrl;
+  const headers = {
+    'Content-Type': 'application/json',
+    'Authorization': OMNI_CONFIG.apiKey
+  };
+  // DMXAPI Responses 接口：本地图片用 input_image + input_text，见 doc.dmxapi.com/res-base64-image.html
+  const payload = {
+    model: OMNI_CONFIG.model,
+    input: [
+      {
+        role: 'user',
+        content: [
+          { type: 'input_image', image_url: imageDataUrl },
+          { type: 'input_text', text: textPrompt }
+        ]
+      }
+    ],
+    stream: true,
+    stream_options: { include_usage: true },
+    modalities: ['text']
+  };
+
+  console.log('Qwen-Omni 请求:', url, 'model:', OMNI_CONFIG.model);
+  const response = await axios.post(url, payload, {
+    headers,
+    responseType: 'stream',
+    timeout: 60000
+  });
+
+  if (response.status !== 200) {
+    throw new Error(`Qwen-Omni HTTP ${response.status}: ${response.statusText}`);
+  }
+
+  return new Promise((resolve, reject) => {
+    let fullText = '';
+    let currentEvent = null;
+    let buffer = '';
+
+    response.data.on('data', (chunk) => {
+      buffer += chunk.toString();
+      const lines = buffer.split(/\r?\n/);
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (trimmed.startsWith('event: ')) {
+          currentEvent = trimmed.slice(7).trim();
+        } else if (trimmed.startsWith('data: ')) {
+          const dataStr = trimmed.slice(6).trim();
+          if (dataStr === '[DONE]') continue;
+          try {
+            const data = JSON.parse(dataStr);
+            if (currentEvent === 'response.output_text.delta' && data.delta) {
+              fullText += data.delta;
+            }
+          } catch (_) {}
+        }
+      }
+    });
+
+    response.data.on('end', () => {
+      if (buffer.trim().startsWith('data: ')) {
+        try {
+          const data = JSON.parse(buffer.trim().slice(6));
+          if (currentEvent === 'response.output_text.delta' && data.delta) fullText += data.delta;
+        } catch (_) {}
+      }
+      resolve(fullText.trim() || '抱歉，分析失败');
+    });
+
+    response.data.on('error', reject);
+  });
+}
+
+// 历史记录存储文件（测试时可从环境变量覆盖）
+const HISTORY_FILE = process.env.HISTORY_FILE || path.join(__dirname, 'history.json');
 
 // 读取历史记录
 function readHistory() {
@@ -126,76 +207,98 @@ app.post('/api/upload', upload.single('image'), (req, res) => {
   });
 });
 
-// 2. 分析画作
+// 2. 分析画作（多模态：传入图片，由大模型看图写专业赏析，200-300 字）
 app.post('/api/analyze', async (req, res) => {
   try {
     const { imagePath, imageUrl } = req.body;
     console.log('收到分析请求:', { imagePath, imageUrl });
-    
-    const prompt = `你是一位中国画鉴赏专家。请仔细欣赏这幅中国画，从以下几个方面进行分析：
-1. 题材内容：画作描绘了什么？
-2. 构图特点：画面布局有何特色？
-3. 技法风格：使用了什么绘画技法？
-4. 意境表达：画作传达了怎样的意境和情感？
-5. 艺术价值：这幅画的艺术价值如何？
 
-请用优美流畅的语言描述，字数控制在 300 字左右。`;
+    if (!imagePath || !fs.existsSync(imagePath)) {
+      return res.status(400).json({ success: false, error: '图片路径无效' });
+    }
 
-    const messages = [
-      { role: 'user', content: prompt }
-    ];
+    const imageBuffer = fs.readFileSync(imagePath);
+    const base64 = imageBuffer.toString('base64');
+    const ext = path.extname(imagePath).toLowerCase();
+    const mime = ext === '.png' ? 'image/png' : ext === '.webp' ? 'image/webp' : 'image/jpeg';
+    const dataUrl = `data:${mime};base64,${base64}`;
 
-    const result = await callSparkAI(messages);
-    console.log('AI分析结果:', result);
-    
-    const analysis = result.choices?.[0]?.message?.content || '抱歉，分析失败';
+    const prompt = `你是一位中国画鉴赏专家。请结合本图，从专业角度对这幅中国画进行赏析评论，需涵盖：
+1. 题材与内容：画作描绘了什么主题与物象？
+2. 构图与布局：画面构图、疏密、留白有何特点？
+3. 技法与风格：用笔、用墨、设色等技法与风格特征？
+4. 意境与情感：画作传达的意境与情感？
+5. 艺术价值：简要评价其艺术价值。
 
-    res.json({ success: true, analysis });
+要求：语言专业、优美流畅，字数严格控制在 200-300 字。`;
+
+    const analysis = await callQwenOmniImageToText(dataUrl, prompt);
+    console.log('AI分析结果长度:', analysis?.length);
+
+    res.json({ success: true, analysis: analysis || '抱歉，分析失败' });
   } catch (error) {
     console.error('分析API错误:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
 
-// 3. 生成诗词
+// 诗/词风格与对应 prompt 描述（诗：体裁；词：风格流派）
+const STYLE_PROMPTS = {
+  '诗-五言绝句': '体裁为五言绝句，四句二十字，符合格律',
+  '诗-七言绝句': '体裁为七言绝句，四句二十八字，符合格律',
+  '诗-五言律诗': '体裁为五言律诗，八句四十字，符合格律',
+  '诗-七言律诗': '体裁为七言律诗，八句五十六字，符合格律',
+  '诗-古体诗': '体裁为古体诗，句数、用韵可较自由',
+  '词-婉约': '词体，婉约派风格，含蓄细腻',
+  '词-豪放': '词体，豪放派风格，开阔激昂',
+  '词-田园': '词体，田园山水风格，清新自然',
+  '词-边塞': '词体，边塞风格，苍凉慷慨'
+};
+
+// 3. 生成诗词（须带标题，内容与 AI 赏析及用户感悟契合）
 app.post('/api/poem', async (req, res) => {
   try {
     const { analysis, userFeeling, style } = req.body;
-    
-    let stylePrompt = '';
-    if (style === '豪放') stylePrompt = '风格豪放激昂';
-    else if (style === '婉约') stylePrompt = '风格婉约细腻';
-    else if (style === '田园') stylePrompt = '风格清新田园';
-    else if (style === '边塞') stylePrompt = '风格苍凉悲壮';
-    
-    const prompt = `你是一位著名诗人。请根据以下中国画赏析和用户感悟，为这幅画创作一首题画诗。
 
-画作赏析：
+    const stylePrompt = STYLE_PROMPTS[style] || '体裁与风格自由发挥，可为诗或词';
+
+    const prompt = `你是一位擅长题画诗/词的诗人。请根据下面的「画作赏析」与「用户感悟」，为这幅中国画创作一首题画作品。
+
+【画作赏析】
 ${analysis}
 
-用户感悟：
+【用户感悟】
 ${userFeeling}
 
 要求：
-1. ${stylePrompt || '风格自由发挥'}
-2. 古体诗或近体诗均可
-3. 诗中要体现画的意境
-4. 请在最后解释一下创作思路（用简短的几句话）
-
-请直接输出诗词，不要其他说明。`;
+1. 体裁与形式：${stylePrompt}
+2. 必须给出一个切题的标题（单独一行，如「题某某图」），标题要与画意、赏析、感悟契合
+3. 正文内容必须紧扣上述赏析与感悟，意境一致，不可泛泛而谈
+4. 仅输出：第一行为标题，空一行后为正文（可含简短创作说明），不要其他前缀或解释`;
 
     const messages = [
       { role: 'user', content: prompt }
     ];
 
     const result = await callSparkAI(messages);
-    const poem = result.choices?.[0]?.message?.content || '抱歉，创作失败';
-    
-    res.json({ success: true, poem });
+    const raw = result.choices?.[0]?.message?.content || '抱歉，创作失败';
+
+    const { title, poem } = parseTitleAndPoem(raw);
+    res.json({ success: true, title, poem: poem || raw });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
 });
+
+function parseTitleAndPoem(raw) {
+  const lines = raw.trim().split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+  if (lines.length === 0) return { title: '无题', poem: raw };
+  const first = lines[0];
+  if (first.length <= 30 && !first.includes('。') && !first.includes('，')) {
+    return { title: first, poem: lines.slice(1).join('\n') || raw };
+  }
+  return { title: '无题', poem: raw };
+}
 
 // 4. 获取历史记录
 app.get('/api/history', (req, res) => {
@@ -228,7 +331,11 @@ app.post('/api/save', (req, res) => {
   res.json({ success: true, record });
 });
 
-// 启动服务
-app.listen(PORT, () => {
-  console.log(`🎨 墨韵 AI 后端服务已启动: http://localhost:${PORT}`);
-});
+// 仅直接运行时启动服务，便于测试时只导入 app
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`🎨 墨韵 AI 后端服务已启动: http://localhost:${PORT}`);
+  });
+}
+
+module.exports = app;
