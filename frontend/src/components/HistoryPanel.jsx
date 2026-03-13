@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import MarkdownRenderer from './MarkdownRenderer'
 
-const API_BASE = ''
+const API_BASE = 'http://localhost:3001'
 
 export default function HistoryPanel({ toast, confirm }) {
   const [history, setHistory] = useState([])
@@ -55,9 +55,11 @@ export default function HistoryPanel({ toast, confirm }) {
           setSelectedHistory(prev => ({ ...prev, favorite: data.favorite }))
         }
         toast.success(data.favorite ? '已收藏' : '已取消收藏')
+      } else {
+        toast.error(data.error || '收藏操作失败')
       }
     } catch (err) {
-      toast.error('操作失败')
+      toast.error('网络请求失败，请检查后端服务是否运行')
     }
   }
 

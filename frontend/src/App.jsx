@@ -8,7 +8,7 @@ import EmptyState from './components/EmptyState'
 import ThemeSwitcher from './components/ThemeSwitcher'
 import useKeyboardShortcuts from './hooks/useKeyboardShortcuts'
 
-const API_BASE = ''
+const API_BASE = 'http://localhost:3001'
 
 function App() {
   const toast = useToast()
