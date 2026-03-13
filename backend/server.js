@@ -100,14 +100,29 @@ async function callQwenOmniImageToText(imageDataUrl, textPrompt) {
     'Content-Type': 'application/json',
     'Authorization': OMNI_CONFIG.apiKey
   };
-  // DMXAPI Responses 接口：本地图片用 input_image + input_text，见 doc.dmxapi.com/res-base64-image.html
+  // DMXAPI Responses 接口：本地图片用 input_image + input_text
+  // 格式参考：https://doc.dmxapi.cn/res-base64-image.html
+  // 从 dataUrl 中提取 base64 数据和格式
+  const matches = imageDataUrl.match(/^data:image\/(\w+);base64,(.+)$/);
+  if (!matches) {
+    throw new Error('Invalid image data URL format');
+  }
+  const imageFormat = matches[1];
+  const base64Data = matches[2];
+  
   const payload = {
     model: OMNI_CONFIG.model,
     input: [
       {
         role: 'user',
         content: [
-          { type: 'input_image', image_url: imageDataUrl },
+          { 
+            type: 'input_image', 
+            input_image: {
+              data: base64Data,
+              format: imageFormat
+            }
+          },
           { type: 'input_text', text: textPrompt }
         ]
       }
