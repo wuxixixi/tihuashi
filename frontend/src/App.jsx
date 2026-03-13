@@ -10,12 +10,14 @@ function App() {
   const [loading, setLoading] = useState(false)
   const [poemLoading, setPoemLoading] = useState(false)
   const [style, setStyle] = useState('')
+  const [isImageModalOpen, setIsImageModalOpen] = useState(false)
   const poemStyles = {
     诗: ['五言绝句', '七言绝句', '五言律诗', '七言律诗', '古体诗'],
     词: ['婉约', '豪放', '田园', '边塞']
   }
   const [history, setHistory] = useState([])
   const [activeTab, setActiveTab] = useState('create')
+  const [selectedHistory, setSelectedHistory] = useState(null)
   const fileInputRef = useRef(null)
 
   const handleFileChange = async (e) => {
@@ -183,7 +185,19 @@ function App() {
               onDragOver={handleDragOver}
             >
               {image ? (
-                <img src={image} alt="预览" className="preview-image" />
+                <div className="preview-container">
+                  <img src={image} alt="预览" className="preview-image" />
+                  <button 
+                    className="zoom-btn"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setIsImageModalOpen(true)
+                    }}
+                    title="放大查看"
+                  >
+                    🔍
+                  </button>
+                </div>
               ) : (
                 <>
                   <p style={{ fontSize: '3rem', marginBottom: '10px' }}>🎨</p>
@@ -208,25 +222,30 @@ function App() {
                 <p>AI 正在赏析画作...</p>
               </div>
             )}
-          </div>
 
-          <div className="result-section">
+            {/* AI 赏析放在画的下方 */}
             {analysis && (
-              <div className="result-card">
+              <div className="result-card analysis-card">
                 <h3>🎨 AI 赏析</h3>
                 <p>{analysis}</p>
               </div>
             )}
 
-            <div className="result-card">
-              <h3>💭 您的感悟</h3>
-              <textarea
-                className="feeling-input"
-                placeholder="请写下您对这幅画的理解和感受..."
-                value={feeling}
-                onChange={(e) => setFeeling(e.target.value)}
-              />
-            </div>
+            {/* 您的感悟也放到左侧 */}
+            {analysis && (
+              <div className="result-card feeling-card">
+                <h3>💭 您的感悟</h3>
+                <textarea
+                  className="feeling-input"
+                  placeholder="请写下您对这幅画的理解和感受..."
+                  value={feeling}
+                  onChange={(e) => setFeeling(e.target.value)}
+                />
+              </div>
+            )}
+          </div>
+
+          <div className="result-section">
 
             <div className="result-card">
               <h3>✍️ 诗词风格</h3>
@@ -291,17 +310,91 @@ function App() {
                   <div className="history-card-content">
                     <h4>{item.title}</h4>
                     <p>{item.poem}</p>
-                    <button 
-                      className="delete-btn"
-                      onClick={() => deleteHistory(item.id)}
-                    >
-                      删除
-                    </button>
+                    <div className="history-card-actions">
+                      <button 
+                        className="view-btn"
+                        onClick={() => setSelectedHistory(item)}
+                      >
+                        查看
+                      </button>
+                      <button 
+                        className="delete-btn"
+                        onClick={() => deleteHistory(item.id)}
+                      >
+                        删除
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* 图片放大查看模态框 */}
+      {isImageModalOpen && image && (
+        <div 
+          className="image-modal"
+          onClick={() => setIsImageModalOpen(false)}
+        >
+          <div className="image-modal-content">
+            <button 
+              className="modal-close-btn"
+              onClick={() => setIsImageModalOpen(false)}
+            >
+              ✕
+            </button>
+            <img src={image} alt="放大查看" className="modal-image" />
+          </div>
+        </div>
+      )}
+
+      {/* 历史记录详情模态框 */}
+      {selectedHistory && (
+        <div 
+          className="history-detail-modal"
+          onClick={() => setSelectedHistory(null)}
+        >
+          <div className="history-detail-content" onClick={e => e.stopPropagation()}>
+            <button 
+              className="modal-close-btn"
+              onClick={() => setSelectedHistory(null)}
+            >
+              ✕
+            </button>
+            
+            <h2>{selectedHistory.title || '无题'}</h2>
+            
+            <div className="history-detail-image">
+              <img src={selectedHistory.imageUrl} alt={selectedHistory.title} />
+            </div>
+            
+            {selectedHistory.analysis && (
+              <div className="history-detail-section">
+                <h3>🎨 AI 赏析</h3>
+                <p>{selectedHistory.analysis}</p>
+              </div>
+            )}
+            
+            {selectedHistory.userFeeling && (
+              <div className="history-detail-section">
+                <h3>💭 您的感悟</h3>
+                <p>{selectedHistory.userFeeling}</p>
+              </div>
+            )}
+            
+            {selectedHistory.poem && (
+              <div className="history-detail-section">
+                <h3>📜 题诗</h3>
+                <div className="history-poem-display">{selectedHistory.poem}</div>
+              </div>
+            )}
+            
+            <div className="history-detail-date">
+              创作时间：{new Date(selectedHistory.createdAt).toLocaleString('zh-CN')}
+            </div>
+          </div>
         </div>
       )}
     </div>

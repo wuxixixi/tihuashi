@@ -57,12 +57,12 @@ const DMX_CONFIG = {
   model: 'gpt-5-mini'
 };
 
-// 多模态模型 qwen3-omni-flash（用于画作赏析，支持图文输入）
-// 文档：https://doc.dmxapi.cn/qwen3-omni-flash.html
+// 多模态模型 Doubao-1.5-vision-pro-32k（用于画作赏析，支持图文输入）
+// 文档：https://doc.dmxapi.cn/doubao-vision.html
 const OMNI_CONFIG = {
   apiKey: DMX_CONFIG.apiKey,
-  responsesUrl: `${DMX_CONFIG.baseUrl}/responses`,
-  model: 'qwen3-omni-flash-all'
+  chatUrl: `${DMX_CONFIG.baseUrl}/chat/completions`,
+  model: 'Doubao-1.5-vision-pro-32k'
 };
 
 // 调用 DMXAPI 大模型（文本对话，用于题诗等）
@@ -91,48 +91,37 @@ async function callSparkAI(messages) {
 }
 
 /**
- * 调用 qwen3-omni-flash 多模态模型（文+图 -> 文），仅支持流式输出
- * 文档要求 stream 必须为 true
+ * 调用 Doubao-1.5-vision-pro-32k 多模态模型（文+图 -> 文）
+ * 使用标准 chat completions 接口
  */
 async function callQwenOmniImageToText(imageDataUrl, textPrompt) {
-  const url = OMNI_CONFIG.responsesUrl;
+  const url = OMNI_CONFIG.chatUrl;
   const headers = {
     'Content-Type': 'application/json',
     'Authorization': OMNI_CONFIG.apiKey
   };
-  // DMXAPI Responses 接口：本地图片用 input_image + input_text
-  // 格式参考：https://doc.dmxapi.cn/res-base64-image.html
-  // 从 dataUrl 中提取 base64 数据和格式
-  const matches = imageDataUrl.match(/^data:image\/(\w+);base64,(.+)$/);
-  if (!matches) {
-    throw new Error('Invalid image data URL format');
-  }
-  const imageFormat = matches[1];
-  const base64Data = matches[2];
-  
+
+  // Doubao 视觉模型使用标准 OpenAI 格式的图片输入
   const payload = {
     model: OMNI_CONFIG.model,
-    input: [
+    messages: [
       {
         role: 'user',
         content: [
           { 
-            type: 'input_image', 
-            input_image: {
-              data: base64Data,
-              format: imageFormat
+            type: 'image_url', 
+            image_url: {
+              url: imageDataUrl
             }
           },
-          { type: 'input_text', text: textPrompt }
+          { type: 'text', text: textPrompt }
         ]
       }
     ],
-    stream: true,
-    stream_options: { include_usage: true },
-    modalities: ['text']
+    stream: true
   };
 
-  console.log('Qwen-Omni 请求:', url, 'model:', OMNI_CONFIG.model);
+  console.log('Doubao Vision 请求:', url, 'model:', OMNI_CONFIG.model);
   const response = await axios.post(url, payload, {
     headers,
     responseType: 'stream',
@@ -140,12 +129,11 @@ async function callQwenOmniImageToText(imageDataUrl, textPrompt) {
   });
 
   if (response.status !== 200) {
-    throw new Error(`Qwen-Omni HTTP ${response.status}: ${response.statusText}`);
+    throw new Error(`Doubao Vision HTTP ${response.status}: ${response.statusText}`);
   }
 
   return new Promise((resolve, reject) => {
     let fullText = '';
-    let currentEvent = null;
     let buffer = '';
 
     response.data.on('data', (chunk) => {
@@ -155,15 +143,14 @@ async function callQwenOmniImageToText(imageDataUrl, textPrompt) {
 
       for (const line of lines) {
         const trimmed = line.trim();
-        if (trimmed.startsWith('event: ')) {
-          currentEvent = trimmed.slice(7).trim();
-        } else if (trimmed.startsWith('data: ')) {
+        if (trimmed.startsWith('data: ')) {
           const dataStr = trimmed.slice(6).trim();
           if (dataStr === '[DONE]') continue;
           try {
             const data = JSON.parse(dataStr);
-            if (currentEvent === 'response.output_text.delta' && data.delta) {
-              fullText += data.delta;
+            const delta = data.choices?.[0]?.delta?.content;
+            if (delta) {
+              fullText += delta;
             }
           } catch (_) {}
         }
@@ -174,7 +161,8 @@ async function callQwenOmniImageToText(imageDataUrl, textPrompt) {
       if (buffer.trim().startsWith('data: ')) {
         try {
           const data = JSON.parse(buffer.trim().slice(6));
-          if (currentEvent === 'response.output_text.delta' && data.delta) fullText += data.delta;
+          const delta = data.choices?.[0]?.delta?.content;
+          if (delta) fullText += delta;
         } catch (_) {}
       }
       resolve(fullText.trim() || '抱歉，分析失败');
