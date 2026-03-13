@@ -21,7 +21,9 @@ function App() {
   const [feeling, setFeeling] = useState('')
   const [loadingStage, setLoadingStage] = useState(null)
   const [activeTab, setActiveTab] = useState('create')
-  const [showGuide, setShowGuide] = useState(true)
+  const [showGuide, setShowGuide] = useState(() => {
+    return !localStorage.getItem('moyun-guide-seen')
+  })
 
   const saveRecord = useCallback(async (title, poemText, style) => {
     try {
@@ -42,11 +44,15 @@ function App() {
     }
   }, [image, analysis, feeling])
 
-  // When user uploads, hide guide
+  const dismissGuide = useCallback(() => {
+    setShowGuide(false)
+    localStorage.setItem('moyun-guide-seen', '1')
+  }, [])
+
   const handleSetImage = useCallback((img) => {
     setImage(img)
-    if (img) setShowGuide(false)
-  }, [])
+    if (img) dismissGuide()
+  }, [dismissGuide])
 
   useKeyboardShortcuts({
     hasModal: false,
@@ -88,7 +94,7 @@ function App() {
       {activeTab === 'create' && (
         <>
           {showGuide && !image ? (
-            <EmptyState onStart={() => setShowGuide(false)} />
+            <EmptyState onStart={dismissGuide} />
           ) : (
             <div className="main-container">
               <UploadPanel
