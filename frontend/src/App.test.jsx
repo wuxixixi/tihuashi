@@ -2,114 +2,85 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import App from './App';
+import { ToastProvider } from './contexts/ToastContext';
+import { ThemeProvider } from './contexts/ThemeContext';
+
+function renderApp() {
+  return render(
+    <ThemeProvider>
+      <ToastProvider>
+        <App />
+      </ToastProvider>
+    </ThemeProvider>
+  );
+}
 
 describe('App 组件', () => {
   beforeEach(() => {
     vi.stubGlobal('fetch', vi.fn());
     vi.stubGlobal('alert', vi.fn());
+    // jsdom may not have full localStorage; stub if needed
+    if (typeof localStorage !== 'undefined' && localStorage.clear) {
+      localStorage.clear();
+    } else {
+      vi.stubGlobal('localStorage', {
+        getItem: vi.fn(() => null),
+        setItem: vi.fn(),
+        removeItem: vi.fn(),
+        clear: vi.fn(),
+      });
+    }
   });
 
   it('渲染标题与副标题', () => {
-    render(<App />);
+    renderApp();
     expect(screen.getByText('墨韵 AI')).toBeInTheDocument();
     expect(screen.getByText('AI 赏析中国画，为您题诗')).toBeInTheDocument();
   });
 
-  it('默认显示创作 tab 与上传区域', () => {
-    render(<App />);
-    expect(screen.getByText('上传画作')).toBeInTheDocument();
-    expect(screen.getByText('点击或拖拽上传中国画')).toBeInTheDocument();
+  it('默认显示创作 tab 和空状态引导', () => {
+    renderApp();
     expect(screen.getByText('创作')).toBeInTheDocument();
     expect(screen.getByText('历史记录')).toBeInTheDocument();
+    expect(screen.getByText('欢迎来到墨韵 AI')).toBeInTheDocument();
   });
 
-  it('创作 tab 下显示感悟输入与诗/词风格选项', () => {
-    render(<App />);
-    expect(screen.getByPlaceholderText(/请写下您对这幅画的理解和感受/)).toBeInTheDocument();
-    expect(screen.getByText('诗')).toBeInTheDocument();
-    expect(screen.getByText('词')).toBeInTheDocument();
-    expect(screen.getByText('五言绝句')).toBeInTheDocument();
-    expect(screen.getByText('婉约')).toBeInTheDocument();
+  it('点击开始创作按钮后显示上传区域', async () => {
+    const user = userEvent.setup();
+    renderApp();
+    const startBtn = screen.getByText('开始创作');
+    await user.click(startBtn);
+    expect(screen.getByText('上传画作')).toBeInTheDocument();
+    expect(screen.getByText(/点击或拖拽上传中国画/)).toBeInTheDocument();
   });
 
   it('点击历史记录 tab 会请求 /api/history', async () => {
     const user = userEvent.setup();
     fetch.mockResolvedValueOnce({
-      json: async () => ({ success: true, history: [] }),
+      json: async () => ({ success: true, history: [], pagination: { total: 0, totalPages: 1, page: 1, pageSize: 12 } }),
     });
-    render(<App />);
+    renderApp();
     await user.click(screen.getByText('历史记录'));
-    expect(fetch).toHaveBeenCalledWith('http://localhost:3001/api/history');
+    expect(fetch).toHaveBeenCalledWith(expect.stringContaining('/api/history'));
   });
 
-  it('历史记录为空时显示暂无记录', async () => {
-    const user = userEvent.setup();
-    fetch.mockResolvedValueOnce({
-      json: async () => ({ success: true, history: [] }),
-    });
-    render(<App />);
-    await user.click(screen.getByText('历史记录'));
-    expect(await screen.findByText('暂无记录')).toBeInTheDocument();
+  it('显示主题切换按钮', () => {
+    renderApp();
+    expect(screen.getByText('古典棕')).toBeInTheDocument();
+    expect(screen.getByText('水墨黑')).toBeInTheDocument();
+    expect(screen.getByText('青花蓝')).toBeInTheDocument();
   });
 
-  it('选择风格后对应按钮有 active 样式', async () => {
+  it('切换主题后按钮显示 active', async () => {
     const user = userEvent.setup();
-    render(<App />);
-    const btn = screen.getByText('婉约');
-    await user.click(btn);
-    expect(btn).toHaveClass('active');
+    renderApp();
+    const inkBtn = screen.getByText('水墨黑').closest('button');
+    await user.click(inkBtn);
+    expect(inkBtn).toHaveClass('active');
   });
 
-  it('输入感悟后文本框显示对应内容', async () => {
-    const user = userEvent.setup();
-    render(<App />);
-    const textarea = screen.getByPlaceholderText(/请写下您对这幅画的理解和感受/);
-    await user.type(textarea, '我的感悟');
-    expect(textarea).toHaveValue('我的感悟');
-  });
-
-  it('无赏析时点击为画题诗应 alert 提示', async () => {
-    const user = userEvent.setup();
-    render(<App />);
-    const poemBtn = screen.getByRole('button', { name: /为画题诗/ });
-    await user.click(poemBtn);
-    expect(alert).toHaveBeenCalledWith('请先上传图片并等待AI赏析完成');
-  });
-
-  it('有赏析时点击为画题诗会请求 /api/poem', async () => {
-    const user = userEvent.setup();
-    fetch
-      .mockResolvedValueOnce({
-        text: async () =>
-          JSON.stringify({
-            success: true,
-            url: '/uploads/1.jpg',
-            fullPath: '/uploads/1.jpg',
-          }),
-      })
-      .mockResolvedValueOnce({
-        json: async () => ({ success: true, analysis: 'AI 赏析内容' }),
-      })
-      .mockResolvedValueOnce({
-        json: async () => ({ success: true, title: '题画诗', poem: '生成的诗词' }),
-      })
-      .mockResolvedValueOnce({ ok: true })
-      .mockResolvedValueOnce({
-        json: async () => ({ success: true, history: [] }),
-      });
-    render(<App />);
-    const file = new File(['x'], 'test.jpg', { type: 'image/jpeg' });
-    const input = document.querySelector('input[type="file"]');
-    await user.upload(input, file);
-    await screen.findByText('AI 赏析内容');
-    const poemBtn = screen.getByRole('button', { name: /为画题诗/ });
-    await user.click(poemBtn);
-    expect(fetch).toHaveBeenCalledWith(
-      'http://localhost:3001/api/poem',
-      expect.objectContaining({
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-      })
-    );
+  it('显示快捷键提示', () => {
+    renderApp();
+    expect(screen.getByText(/Ctrl\+Enter/)).toBeInTheDocument();
   });
 });

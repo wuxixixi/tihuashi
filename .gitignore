@@ -1,0 +1,35 @@
+# Dependencies
+node_modules/
+
+# Environment variables
+.env
+.env.local
+
+# Database files
+*.db
+*.db-shm
+*.db-wal
+
+# Uploaded files
+backend/uploads/*.jpg
+backend/uploads/*.png
+backend/uploads/*.webp
+!backend/uploads/.gitkeep
+
+# Build output
+frontend/dist/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Test artifacts
+coverage/
+*.log
+
+# Vitest cache
+frontend/node_modules/.vite/
