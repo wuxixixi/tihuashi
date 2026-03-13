@@ -1497,6 +1497,68 @@ body {
   }
 }
 
+/* ==================== Markdown Renderer ==================== */
+.markdown-body {
+  line-height: 1.9;
+  color: #5D4037;
+}
+
+.markdown-body .md-heading {
+  color: var(--primary);
+  margin: 14px 0 8px;
+  font-weight: 600;
+}
+
+.markdown-body h3.md-heading {
+  font-size: 1.05rem;
+}
+
+.markdown-body h4.md-heading {
+  font-size: 1rem;
+}
+
+.markdown-body h5.md-heading,
+.markdown-body h6.md-heading {
+  font-size: 0.95rem;
+}
+
+.markdown-body .md-para {
+  margin: 8px 0;
+  text-indent: 2em;
+  text-align: justify;
+}
+
+.markdown-body .md-ol,
+.markdown-body .md-ul {
+  margin: 8px 0;
+  padding-left: 1.6em;
+}
+
+.markdown-body .md-ol li,
+.markdown-body .md-ul li {
+  margin: 4px 0;
+  line-height: 1.8;
+}
+
+.markdown-body .md-ol li::marker {
+  color: var(--primary);
+  font-weight: 600;
+}
+
+.markdown-body .md-ul li::marker {
+  color: var(--secondary);
+}
+
+.markdown-body strong {
+  color: var(--primary);
+  font-weight: 700;
+}
+
+.markdown-body em {
+  font-style: italic;
+  color: var(--accent, var(--secondary));
+}
+
 /* ==================== Accessibility ==================== */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

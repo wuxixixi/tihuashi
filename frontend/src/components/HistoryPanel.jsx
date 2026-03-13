@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import MarkdownRenderer from './MarkdownRenderer'
 
 const API_BASE = ''
 
@@ -198,7 +199,7 @@ export default function HistoryPanel({ toast, confirm }) {
             {selectedHistory.analysis && (
               <div className="history-detail-section">
                 <h3>&#x1F3A8; AI 赏析</h3>
-                <p>{selectedHistory.analysis}</p>
+                <MarkdownRenderer content={selectedHistory.analysis} />
               </div>
             )}
 

@@ -1,5 +1,6 @@
 import { useRef, useState, useEffect } from 'react'
 import LoadingProgress from './LoadingProgress'
+import MarkdownRenderer from './MarkdownRenderer'
 
 const API_BASE = ''
 
@@ -178,7 +179,7 @@ export default function UploadPanel({ image, setImage, imagePath, setImagePath, 
       {analysis && (
         <div className="result-card analysis-card slide-up">
           <h3>&#x1F3A8; AI 赏析</h3>
-          <p>{analysis}</p>
+          <MarkdownRenderer content={analysis} />
         </div>
       )}
 
