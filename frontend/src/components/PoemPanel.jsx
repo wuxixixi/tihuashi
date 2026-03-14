@@ -1,6 +1,6 @@
 import { useState } from 'react'
 
-const API_BASE = import.meta.env.PROD ? '' : 'http://localhost:3001'
+const API_BASE = ''
 
 const poemStyles = {
   '诗': ['五言绝句', '七言绝句', '五言律诗', '七言律诗', '古体诗'],
