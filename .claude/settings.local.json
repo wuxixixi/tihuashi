@@ -1,0 +1,26 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cd backend:*)",
+      "Bash(cd frontend:*)",
+      "Bash(sleep:*)",
+      "Bash(curl:*)",
+      "Bash(node:*)",
+      "Bash(pkill:*)",
+      "Bash(netstat:*)",
+      "Bash(taskkill:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(git tag:*)",
+      "Bash(cd dist:*)",
+      "Bash(ls:*)",
+      "Bash(where gh:*)",
+      "Bash(winget install:*)",
+      "Bash(gh:*)",
+      "Bash(cd:*)",
+      "Bash(ping:*)",
+      "Bash(git config:*)"
+    ]
+  }
+}
