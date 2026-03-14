@@ -306,15 +306,15 @@ body {
 }
 
 .batch-results {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 15px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
 }
 
 .batch-item {
   display: flex;
-  gap: 12px;
-  padding: 12px;
+  gap: 16px;
+  padding: 16px;
   background: var(--cardBg);
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -329,8 +329,8 @@ body {
 }
 
 .batch-item-img {
-  width: 80px;
-  height: 80px;
+  width: 120px;
+  height: 120px;
   flex-shrink: 0;
 }
 
@@ -347,8 +347,8 @@ body {
 }
 
 .batch-item-info h4 {
-  margin: 0 0 5px;
-  font-size: 0.9rem;
+  margin: 0 0 8px;
+  font-size: 1rem;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -366,6 +366,36 @@ body {
 
 .batch-item-info .error-text {
   color: #f44336;
+}
+
+.batch-analysis-full {
+  margin: 10px 0;
+  padding: 12px;
+  background: linear-gradient(135deg, #FFF8E1, #FFF3E0);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  max-height: 250px;
+  overflow-y: auto;
+  line-height: 1.8;
+  font-size: 0.9rem;
+}
+
+.batch-analysis-full::-webkit-scrollbar {
+  width: 8px;
+}
+
+.batch-analysis-full::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+.batch-analysis-full::-webkit-scrollbar-thumb {
+  background: #c9a66b;
+  border-radius: 4px;
+}
+
+.batch-analysis-full::-webkit-scrollbar-thumb:hover {
+  background: #a88b5a;
 }
 
 .btn-secondary {
@@ -1067,6 +1097,17 @@ body {
   background: var(--secondary);
   color: white;
   border-color: var(--secondary);
+}
+
+.action-btn.delete-btn {
+  color: #c62828;
+  border-color: #e57373;
+}
+
+.action-btn.delete-btn:hover {
+  background: #c62828;
+  color: white;
+  border-color: #c62828;
 }
 
 .import-btn {

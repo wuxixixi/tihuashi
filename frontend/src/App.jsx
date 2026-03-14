@@ -143,6 +143,8 @@ function App() {
                 loadingStage={loadingStage}
                 setLoadingStage={setLoadingStage}
                 toast={toast}
+                genre={genre}
+                setGenre={setGenre}
               />
               <PoemPanel
                 analysis={analysis}

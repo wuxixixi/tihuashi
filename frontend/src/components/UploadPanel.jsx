@@ -2,7 +2,7 @@ import { useRef, useState, useEffect } from 'react'
 import LoadingProgress from './LoadingProgress'
 import MarkdownRenderer from './MarkdownRenderer'
 
-const API_BASE = ''
+const API_BASE = 'http://localhost:3001'
 
 export default function UploadPanel({ image, setImage, imagePath, setImagePath, analysis, setAnalysis, feeling, setFeeling, loadingStage, setLoadingStage, toast, genre, setGenre }) {
   const fileInputRef = useRef(null)
@@ -173,14 +173,41 @@ export default function UploadPanel({ image, setImage, imagePath, setImagePath, 
   const exitBatchMode = () => {
     setBatchMode(false)
     setBatchResults([])
+    // 清空单图状态
+    setImage(null)
+    setImagePath('')
+    setAnalysis('')
+    setFeeling('')
+    setGenre('')
   }
 
   // 使用批量结果中的某一项
-  const useBatchResult = (result) => {
+  const useBatchResult = async (result) => {
+    // 保存到历史记录
+    try {
+      await fetch(`${API_BASE}/api/save`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          imageUrl: result.imageUrl,
+          analysis: result.analysis,
+          userFeeling: '',
+          poem: '',
+          title: result.file.replace(/\.[^/.]+$/, ''),
+          style: '',
+          genre: result.genre || ''
+        })
+      })
+      toast.success('已保存到历史记录')
+    } catch (err) {
+      console.error('保存失败', err)
+    }
+
     setImage(result.imageUrl)
     setImagePath(result.imagePath || '')
     setAnalysis(result.analysis || '')
     setGenre(result.genre || '')
+    setFeeling('')
     setBatchMode(false)
     setBatchResults([])
   }
@@ -270,7 +297,9 @@ export default function UploadPanel({ image, setImage, imagePath, setImagePath, 
                 {result.genre && <span className="genre-tag">{result.genre}</span>}
                 {result.analysis ? (
                   <>
-                    <p>{result.analysis.substring(0, 100)}...</p>
+                    <div className="batch-analysis-full">
+                      <MarkdownRenderer content={result.analysis} />
+                    </div>
                     <button className="btn-small" onClick={() => useBatchResult(result)}>
                       使用此结果
                     </button>
@@ -302,7 +331,7 @@ export default function UploadPanel({ image, setImage, imagePath, setImagePath, 
       <div className="upload-mode-toggle">
         <button
           className={`mode-btn ${!batchMode ? 'active' : ''}`}
-          onClick={() => { setBatchMode(false); multiFileInputRef.current?.click() }}
+          onClick={() => fileInputRef.current?.click()}
         >
           单图上传
         </button>

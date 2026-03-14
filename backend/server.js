@@ -145,11 +145,27 @@ async function callQwenOmniImageToText(imageDataUrl, textPrompt) {
   };
 
   console.log('Doubao Vision 请求:', url, 'model:', OMNI_CONFIG.model);
-  const response = await axios.post(url, payload, {
-    headers,
-    responseType: 'stream',
-    timeout: 60000
-  });
+  let response;
+  try {
+    response = await axios.post(url, payload, {
+      headers,
+      responseType: 'stream',
+      timeout: 60000
+    });
+  } catch (err) {
+    // 尝试读取错误响应体
+    if (err.response && err.response.data) {
+      const errorData = [];
+      await new Promise((resolve) => {
+        err.response.data.on('data', chunk => errorData.push(chunk));
+        err.response.data.on('end', resolve);
+      });
+      const errorText = Buffer.concat(errorData).toString();
+      console.error('Doubao Vision 错误响应:', errorText);
+      throw new Error(`API 错误: ${errorText}`);
+    }
+    throw err;
+  }
 
   if (response.status !== 200) {
     throw new Error(`Doubao Vision HTTP ${response.status}: ${response.statusText}`);
@@ -550,6 +566,16 @@ app.post('/api/history/batch', (req, res) => {
     } else {
       res.status(400).json({ success: false, error: '未知操作' })
     }
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message })
+  }
+})
+
+// 13. 删除全部历史记录
+app.delete('/api/history', (req, res) => {
+  try {
+    const result = db.prepare('DELETE FROM history').run()
+    res.json({ success: true, deleted: result.changes })
   } catch (error) {
     res.status(500).json({ success: false, error: error.message })
   }

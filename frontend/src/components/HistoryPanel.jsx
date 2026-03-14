@@ -61,6 +61,24 @@ export default function HistoryPanel({ toast, confirm }) {
     }
   }
 
+  const deleteAllHistory = async () => {
+    const ok = await confirm('确定要删除全部历史记录吗？此操作不可恢复！', '删除全部确认')
+    if (!ok) return
+    try {
+      const res = await fetch(`${API_BASE}/api/history`, { method: 'DELETE' })
+      const data = await res.json()
+      if (data.success) {
+        toast.success(`已删除 ${data.deleted} 条记录`)
+        loadHistory()
+        setSelectedHistory(null)
+      } else {
+        toast.error(data.error || '删除失败')
+      }
+    } catch (err) {
+      toast.error('删除失败')
+    }
+  }
+
   const toggleFavorite = async (id) => {
     try {
       const res = await fetch(`${API_BASE}/api/history/${id}/favorite`, { method: 'PATCH' })
@@ -256,6 +274,14 @@ export default function HistoryPanel({ toast, confirm }) {
               style={{ display: 'none' }}
             />
           </label>
+          <button
+            type="button"
+            className="action-btn delete-btn"
+            onClick={deleteAllHistory}
+            title="删除全部记录"
+          >
+            全删
+          </button>
         </div>
       </div>
 
