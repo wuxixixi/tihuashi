@@ -8,7 +8,7 @@ import EmptyState from './components/EmptyState'
 import ThemeSwitcher from './components/ThemeSwitcher'
 import useKeyboardShortcuts from './hooks/useKeyboardShortcuts'
 
-const API_BASE = 'http://localhost:3001'
+const API_BASE = import.meta.env.PROD ? '' : 'http://localhost:3001'
 
 // 草稿键名
 const DRAFT_KEY = 'moyun-draft'

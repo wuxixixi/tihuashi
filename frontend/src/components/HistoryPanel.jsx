@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import MarkdownRenderer from './MarkdownRenderer'
 
-const API_BASE = 'http://localhost:3001'
+const API_BASE = import.meta.env.PROD ? '' : 'http://localhost:3001'
 
 // 常用标签建议
 const SUGGESTED_TAGS = ['山水', '花鸟', '人物', '写意', '工笔', '精品', '收藏', '思乡', '送别', '田园', '边塞', '怀古']

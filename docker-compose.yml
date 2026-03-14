@@ -3,16 +3,25 @@ version: '3.8'
 services:
   backend:
     build: ./backend
+    container_name: moyun-backend
+    restart: unless-stopped
     ports:
       - "3001:3001"
     volumes:
-      - ./backend/uploads:/app/uploads
-      - ./backend/history.json:/app/history.json
+      - ./data/uploads:/app/uploads
+      - ./data/db:/app/data
     environment:
+      - DMX_API_KEY=${DMX_API_KEY}
+      - DMX_BASE_URL=${DMX_BASE_URL:-https://www.dmxapi.cn/v1}
+      - DMX_MODEL=${DMX_MODEL:-gpt-5-mini}
+      - VISION_MODEL=${VISION_MODEL:-Doubao-1.5-vision-pro-32k}
       - PORT=3001
+      - DB_PATH=/app/data/moyun.db
 
   frontend:
     build: ./frontend
+    container_name: moyun-frontend
+    restart: unless-stopped
     ports:
       - "80:80"
     depends_on:
