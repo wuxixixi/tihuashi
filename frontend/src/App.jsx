@@ -29,6 +29,12 @@ function App() {
     return !localStorage.getItem('moyun-guide-seen')
   })
 
+  // 留言状态
+  const [messages, setMessages] = useState([])
+  const [msgName, setMsgName] = useState('')
+  const [msgContent, setMsgContent] = useState('')
+  const [msgSubmitting, setMsgSubmitting] = useState(false)
+
   // 恢复草稿
   useEffect(() => {
     const draft = localStorage.getItem(DRAFT_KEY)
@@ -87,6 +93,54 @@ function App() {
     setImage(img)
     if (img) dismissGuide()
   }, [dismissGuide])
+
+  // 加载留言
+  const loadMessages = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/messages`)
+      const data = await res.json()
+      if (data.success) {
+        setMessages(data.messages)
+      }
+    } catch (err) {
+      console.error('加载留言失败', err)
+    }
+  }, [])
+
+  // 提交留言
+  const submitMessage = async (e) => {
+    e.preventDefault()
+    if (!msgContent.trim()) {
+      toast.warning('请输入留言内容')
+      return
+    }
+    setMsgSubmitting(true)
+    try {
+      const res = await fetch(`${API_BASE}/api/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: msgName, content: msgContent })
+      })
+      const data = await res.json()
+      if (data.success) {
+        setMessages([data.message, ...messages])
+        setMsgContent('')
+        toast.success('留言成功')
+      } else {
+        toast.error(data.error || '留言失败')
+      }
+    } catch (err) {
+      toast.error('留言失败')
+    }
+    setMsgSubmitting(false)
+  }
+
+  // 切换到关于我们时加载留言
+  useEffect(() => {
+    if (activeTab === 'about') {
+      loadMessages()
+    }
+  }, [activeTab, loadMessages])
 
   useKeyboardShortcuts({
     hasModal: false,
@@ -197,6 +251,59 @@ function App() {
             <div className="contact-info">
               <span>📧 contact@juece.ai</span>
               <span>🌐 上海 · 浦东新区</span>
+            </div>
+          </div>
+
+          <div className="about-messages">
+            <h3>💬 用户留言</h3>
+            <form className="message-form" onSubmit={submitMessage}>
+              <div className="form-row">
+                <input
+                  type="text"
+                  placeholder="您的昵称（选填）"
+                  value={msgName}
+                  onChange={(e) => setMsgName(e.target.value)}
+                  maxLength={50}
+                  className="msg-name-input"
+                />
+              </div>
+              <div className="form-row">
+                <textarea
+                  placeholder="写下您的留言..."
+                  value={msgContent}
+                  onChange={(e) => setMsgContent(e.target.value)}
+                  maxLength={500}
+                  className="msg-content-input"
+                  rows={3}
+                />
+                <span className="char-count">{msgContent.length}/500</span>
+              </div>
+              <button type="submit" className="btn msg-submit-btn" disabled={msgSubmitting}>
+                {msgSubmitting ? '提交中...' : '提交留言'}
+              </button>
+            </form>
+
+            <div className="messages-list">
+              {messages.length === 0 ? (
+                <p className="no-messages">暂无留言，来抢个沙发吧~</p>
+              ) : (
+                messages.map((msg) => (
+                  <div key={msg.id} className="message-item">
+                    <div className="msg-header">
+                      <span className="msg-author">{msg.name}</span>
+                      <span className="msg-time">
+                        {new Date(msg.createdAt).toLocaleString('zh-CN', {
+                          month: 'numeric',
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </span>
+                    </div>
+                    <p className="msg-content">{msg.content}</p>
+                  </div>
+                ))
+              )}
             </div>
           </div>
 

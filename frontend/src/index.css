@@ -2201,6 +2201,130 @@ button:focus-visible {
   font-size: 0.9rem;
 }
 
+/* 留言区域 */
+.about-messages {
+  background: var(--cardBg);
+  border-radius: 12px;
+  padding: 30px;
+  margin-bottom: 20px;
+  border: 1px solid var(--border);
+}
+
+.about-messages h3 {
+  text-align: center;
+  color: var(--primary);
+  margin-bottom: 25px;
+  font-size: 1.2rem;
+}
+
+.message-form {
+  margin-bottom: 25px;
+  padding-bottom: 25px;
+  border-bottom: 1px dashed var(--border);
+}
+
+.form-row {
+  margin-bottom: 15px;
+  position: relative;
+}
+
+.msg-name-input {
+  width: 100%;
+  max-width: 300px;
+  padding: 10px 15px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-family: 'Noto Serif SC', serif;
+  background: var(--paper);
+  transition: border-color 0.3s;
+}
+
+.msg-name-input:focus {
+  outline: none;
+  border-color: var(--secondary);
+}
+
+.msg-content-input {
+  width: 100%;
+  padding: 12px 15px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-family: 'Noto Serif SC', serif;
+  resize: vertical;
+  min-height: 80px;
+  background: var(--paper);
+  transition: border-color 0.3s;
+}
+
+.msg-content-input:focus {
+  outline: none;
+  border-color: var(--secondary);
+}
+
+.char-count {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  font-size: 0.75rem;
+  color: #aaa;
+}
+
+.msg-submit-btn {
+  margin-top: 10px;
+}
+
+.messages-list {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.no-messages {
+  text-align: center;
+  color: #888;
+  padding: 30px;
+  font-size: 0.9rem;
+}
+
+.message-item {
+  padding: 15px;
+  background: var(--paper);
+  border-radius: 8px;
+  margin-bottom: 12px;
+  border: 1px solid var(--border);
+}
+
+.message-item:last-child {
+  margin-bottom: 0;
+}
+
+.msg-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.msg-author {
+  font-weight: 600;
+  color: var(--primary);
+  font-size: 0.9rem;
+}
+
+.msg-time {
+  font-size: 0.75rem;
+  color: #aaa;
+}
+
+.msg-content {
+  color: var(--text);
+  font-size: 0.9rem;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .about-footer {
   text-align: center;
   padding: 20px;

@@ -76,6 +76,13 @@ db.exec(`
     tags TEXT DEFAULT '[]',
     favorite INTEGER DEFAULT 0,
     createdAt TEXT
+  );
+
+  CREATE TABLE IF NOT EXISTS messages (
+    id TEXT PRIMARY KEY,
+    name TEXT,
+    content TEXT NOT NULL,
+    createdAt TEXT
   )
 `);
 
@@ -576,6 +583,42 @@ app.delete('/api/history', (req, res) => {
   try {
     const result = db.prepare('DELETE FROM history').run()
     res.json({ success: true, deleted: result.changes })
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message })
+  }
+})
+
+// ==================== 留言 API ====================
+
+// 获取留言列表
+app.get('/api/messages', (req, res) => {
+  try {
+    const messages = db.prepare('SELECT * FROM messages ORDER BY createdAt DESC LIMIT 50').all()
+    res.json({ success: true, messages })
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message })
+  }
+})
+
+// 提交留言
+app.post('/api/messages', (req, res) => {
+  try {
+    const { name, content } = req.body
+    if (!content || content.trim() === '') {
+      return res.status(400).json({ success: false, error: '留言内容不能为空' })
+    }
+    if (content.length > 500) {
+      return res.status(400).json({ success: false, error: '留言内容不能超过500字' })
+    }
+    const id = uuidv4()
+    const createdAt = new Date().toISOString()
+    db.prepare('INSERT INTO messages (id, name, content, createdAt) VALUES (?, ?, ?, ?)').run(
+      id,
+      (name || '匿名用户').slice(0, 50),
+      content.trim(),
+      createdAt
+    )
+    res.json({ success: true, message: { id, name: name || '匿名用户', content: content.trim(), createdAt } })
   } catch (error) {
     res.status(500).json({ success: false, error: error.message })
   }
