@@ -115,7 +115,6 @@ function App() {
           </div>
           <ThemeSwitcher />
         </div>
-        <div className="header-slogan">上海觉测信息科技有限公司 出品</div>
       </header>
 
       <div className="tabs">
@@ -245,6 +244,13 @@ function App() {
       {activeTab === 'history' && (
         <HistoryPanel toast={toast} confirm={confirm} />
       )}
+
+      <footer className="app-footer">
+        <div className="footer-content">
+          <p className="copyright">© 2026 上海觉测信息科技有限公司 版权所有</p>
+          <p className="footer-slogan">以 AI 之力，传承文化之美</p>
+        </div>
+      </footer>
 
       {confirmDialog}
     </div>

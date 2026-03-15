@@ -141,6 +141,33 @@ body {
   letter-spacing: 2px;
 }
 
+/* ==================== Footer ==================== */
+.app-footer {
+  margin-top: 50px;
+  padding: 25px 20px;
+  border-top: 1px solid var(--border);
+  background: var(--paper);
+  text-align: center;
+}
+
+.footer-content {
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.copyright {
+  font-size: 0.9rem;
+  color: var(--primary);
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+
+.footer-slogan {
+  font-size: 0.8rem;
+  color: #888;
+  letter-spacing: 2px;
+}
+
 /* ==================== Theme Switcher ==================== */
 .theme-switcher {
   display: flex;
