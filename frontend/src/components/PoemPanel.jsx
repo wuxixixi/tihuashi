@@ -7,6 +7,17 @@ const poemStyles = {
   '词': ['婉约', '豪放', '田园', '边塞']
 }
 
+// 重写风格选项
+const rewriteStyles = ['五言绝句', '七言绝句', '五言律诗', '七言律诗', '古体诗', '婉约词', '豪放词', '田园词', '边塞词']
+
+// 书法风格配置
+const calligraphyStyles = {
+  classic: { name: '古典雅致', bg: '#FEF9E7', border: '#8B4513', text: '#3E2723', accent: '#DEB887' },
+  ink: { name: '水墨丹青', bg: '#F5F5F5', border: '#2C2C2C', text: '#1A1A1A', accent: '#666666' },
+  vermilion: { name: '朱砂红韵', bg: '#FFF8F0', border: '#B22222', text: '#8B0000', accent: '#CD5C5C' },
+  bamboo: { name: '竹韵清风', bg: '#F0F8F0', border: '#228B22', text: '#006400', accent: '#90EE90' }
+}
+
 export default function PoemPanel({ analysis, feeling, image, setLoadingStage, toast, onSaveRecord, genre }) {
   const [style, setStyle] = useState('')
   const [customStyle, setCustomStyle] = useState('')
@@ -17,6 +28,18 @@ export default function PoemPanel({ analysis, feeling, image, setLoadingStage, t
   const [isEditing, setIsEditing] = useState(false)
   const [editPoem, setEditPoem] = useState('')
   const [editTitle, setEditTitle] = useState('')
+
+  // AI 增强功能状态
+  const [polishLoading, setPolishLoading] = useState(false)
+  const [rewriteLoading, setRewriteLoading] = useState(false)
+  const [analyzeLoading, setAnalyzeLoading] = useState(false)
+  const [showRewriteModal, setShowRewriteModal] = useState(false)
+  const [showAnalyzeModal, setShowAnalyzeModal] = useState(false)
+  const [showCalligraphyModal, setShowCalligraphyModal] = useState(false)
+  const [selectedRewriteStyle, setSelectedRewriteStyle] = useState('')
+  const [selectedCalligraphyStyle, setSelectedCalligraphyStyle] = useState('classic')
+  const [poemAnalysis, setPoemAnalysis] = useState('')
+  const [polishSuggestion, setPolishSuggestion] = useState('')
 
   const generatePoem = async () => {
     if (!analysis) {
@@ -54,6 +77,7 @@ export default function PoemPanel({ analysis, feeling, image, setLoadingStage, t
   const startEdit = () => {
     setEditPoem(poem)
     setEditTitle(poemTitle)
+    setPolishSuggestion('')
     setIsEditing(true)
   }
 
@@ -66,6 +90,90 @@ export default function PoemPanel({ analysis, feeling, image, setLoadingStage, t
 
   const cancelEdit = () => {
     setIsEditing(false)
+    setPolishSuggestion('')
+  }
+
+  // AI 润色
+  const polishPoem = async () => {
+    if (!editPoem.trim()) {
+      toast.warning('请先输入诗词内容')
+      return
+    }
+    setPolishLoading(true)
+    try {
+      const res = await fetch(`${API_BASE}/api/polish`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ poem: editPoem, title: editTitle, style })
+      })
+      const data = await res.json()
+      if (data.success) {
+        setEditTitle(data.polishedTitle)
+        setEditPoem(data.polishedPoem)
+        setPolishSuggestion(data.suggestions)
+        toast.success('润色完成')
+      } else {
+        toast.error('润色失败: ' + (data.error || ''))
+      }
+    } catch (err) {
+      toast.error('润色失败，请重试')
+    }
+    setPolishLoading(false)
+  }
+
+  // 风格重写
+  const rewritePoem = async () => {
+    if (!selectedRewriteStyle) {
+      toast.warning('请选择目标风格')
+      return
+    }
+    setRewriteLoading(true)
+    try {
+      const res = await fetch(`${API_BASE}/api/rewrite`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ poem, title: poemTitle, targetStyle: selectedRewriteStyle })
+      })
+      const data = await res.json()
+      if (data.success) {
+        setPoem(data.newPoem)
+        setPoemTitle(data.newTitle)
+        setShowRewriteModal(false)
+        setSelectedRewriteStyle('')
+        toast.success(`已重写为${selectedRewriteStyle}`)
+      } else {
+        toast.error('重写失败: ' + (data.error || ''))
+      }
+    } catch (err) {
+      toast.error('重写失败，请重试')
+    }
+    setRewriteLoading(false)
+  }
+
+  // 诗词解析
+  const analyzePoem = async () => {
+    if (!poem.trim()) {
+      toast.warning('请先生成诗词')
+      return
+    }
+    setAnalyzeLoading(true)
+    try {
+      const res = await fetch(`${API_BASE}/api/analyze-poem`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ poem, title: poemTitle })
+      })
+      const data = await res.json()
+      if (data.success) {
+        setPoemAnalysis(data.analysis)
+        setShowAnalyzeModal(true)
+      } else {
+        toast.error('解析失败: ' + (data.error || ''))
+      }
+    } catch (err) {
+      toast.error('解析失败，请重试')
+    }
+    setAnalyzeLoading(false)
   }
 
   const copyPoem = () => {
@@ -77,58 +185,92 @@ export default function PoemPanel({ analysis, feeling, image, setLoadingStage, t
     })
   }
 
-  const exportAsImage = () => {
+  // 书法风格导出
+  const exportCalligraphy = () => {
     const canvas = document.createElement('canvas')
     const ctx = canvas.getContext('2d')
     const w = 800
-    const h = 1000
+    const h = 1200
     canvas.width = w
     canvas.height = h
 
-    // Background
-    ctx.fillStyle = '#FEF9E7'
+    const cstyle = calligraphyStyles[selectedCalligraphyStyle]
+
+    // 背景
+    ctx.fillStyle = cstyle.bg
     ctx.fillRect(0, 0, w, h)
 
-    // Border decoration
-    ctx.strokeStyle = '#8B4513'
-    ctx.lineWidth = 3
-    ctx.strokeRect(30, 30, w - 60, h - 60)
-    ctx.strokeStyle = '#DEB887'
-    ctx.lineWidth = 1
-    ctx.strokeRect(40, 40, w - 80, h - 80)
+    // 添加宣纸纹理效果
+    ctx.globalAlpha = 0.03
+    for (let i = 0; i < 1000; i++) {
+      ctx.fillStyle = Math.random() > 0.5 ? '#000' : '#fff'
+      ctx.fillRect(Math.random() * w, Math.random() * h, 1, 1)
+    }
+    ctx.globalAlpha = 1
 
-    // Title
-    ctx.fillStyle = '#8B4513'
-    ctx.font = 'bold 36px "Ma Shan Zheng", "KaiTi", serif'
+    // 双层边框
+    ctx.strokeStyle = cstyle.border
+    ctx.lineWidth = 4
+    ctx.strokeRect(30, 30, w - 60, h - 60)
+    ctx.strokeStyle = cstyle.accent
+    ctx.lineWidth = 1
+    ctx.strokeRect(45, 45, w - 90, h - 90)
+
+    // 标题
+    ctx.fillStyle = cstyle.border
+    ctx.font = 'bold 42px "Ma Shan Zheng", "KaiTi", serif'
     ctx.textAlign = 'center'
     if (poemTitle) {
-      ctx.fillText(poemTitle, w / 2, 120)
+      ctx.fillText(poemTitle, w / 2, 140)
     }
 
-    // Poem body
-    ctx.font = '28px "Ma Shan Zheng", "KaiTi", serif'
-    ctx.fillStyle = '#3E2723'
+    // 分隔线
+    ctx.strokeStyle = cstyle.accent
+    ctx.lineWidth = 1
+    ctx.beginPath()
+    ctx.moveTo(200, 180)
+    ctx.lineTo(w - 200, 180)
+    ctx.stroke()
+
+    // 诗词正文（竖排效果改为横排）
+    ctx.font = '32px "Ma Shan Zheng", "KaiTi", serif'
+    ctx.fillStyle = cstyle.text
     const lines = poem.split('\n').filter(Boolean)
-    let y = poemTitle ? 200 : 160
+    let y = poemTitle ? 260 : 200
     for (const line of lines) {
       ctx.fillText(line, w / 2, y)
-      y += 50
+      y += 60
     }
 
-    // Watermark
-    ctx.fillStyle = '#DEB887'
-    ctx.font = '16px "Noto Serif SC", serif'
-    ctx.fillText('墨韵 AI', w / 2, h - 60)
+    // 印章效果
+    ctx.fillStyle = '#C41E3A'
+    ctx.font = 'bold 24px "Ma Shan Zheng", serif'
+    ctx.textAlign = 'right'
+    ctx.fillText('墨韵', w - 80, h - 120)
+    ctx.strokeStyle = '#C41E3A'
+    ctx.lineWidth = 2
+    ctx.strokeRect(w - 130, h - 150, 60, 50)
+
+    // 底部水印
+    ctx.fillStyle = cstyle.accent
+    ctx.font = '14px "Noto Serif SC", serif'
+    ctx.textAlign = 'center'
+    ctx.fillText('墨韵 AI · ' + cstyle.name, w / 2, h - 40)
 
     canvas.toBlob((blob) => {
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `${poemTitle || '题画诗'}.png`
+      a.download = `${poemTitle || '题画诗'}_${cstyle.name}.png`
       a.click()
       URL.revokeObjectURL(url)
-      toast.success('已导出为图片')
+      setShowCalligraphyModal(false)
+      toast.success('已导出书法风格图片')
     })
+  }
+
+  const exportAsImage = () => {
+    setShowCalligraphyModal(true)
   }
 
   // 生成分享卡片
@@ -298,10 +440,16 @@ export default function PoemPanel({ analysis, feeling, image, setLoadingStage, t
               <button className="icon-btn" onClick={startEdit} title="编辑">
                 &#x270F;&#xFE0F;
               </button>
+              <button className="icon-btn" onClick={() => setShowRewriteModal(true)} title="风格重写">
+                &#x1F4DD;
+              </button>
+              <button className="icon-btn" onClick={analyzePoem} title="AI解析" disabled={analyzeLoading}>
+                &#x1F50D;
+              </button>
               <button className="icon-btn" onClick={copyPoem} title="复制">
                 &#x1F4CB;
               </button>
-              <button className="icon-btn" onClick={exportAsImage} title="导出图片">
+              <button className="icon-btn" onClick={exportAsImage} title="书法导出">
                 &#x1F4E5;
               </button>
               <button className="icon-btn" onClick={generateShareCard} title="生成分享卡片" style={{ color: '#1976D2' }}>
@@ -323,7 +471,15 @@ export default function PoemPanel({ analysis, feeling, image, setLoadingStage, t
                 value={editPoem}
                 onChange={(e) => setEditPoem(e.target.value)}
               />
+              {polishSuggestion && (
+                <div className="polish-suggestion">
+                  <strong>AI建议：</strong>{polishSuggestion}
+                </div>
+              )}
               <div className="poem-edit-actions">
+                <button className="btn-small btn-polish" onClick={polishPoem} disabled={polishLoading}>
+                  {polishLoading ? '润色中...' : 'AI润色'}
+                </button>
                 <button className="btn-small btn-save" onClick={saveEdit}>保存</button>
                 <button className="btn-small btn-cancel-edit" onClick={cancelEdit}>取消</button>
               </div>
@@ -334,6 +490,76 @@ export default function PoemPanel({ analysis, feeling, image, setLoadingStage, t
               <div className="poem-display">{poem}</div>
             </>
           )}
+        </div>
+      )}
+
+      {/* 风格重写弹窗 */}
+      {showRewriteModal && (
+        <div className="modal-overlay" onClick={() => setShowRewriteModal(false)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()}>
+            <h3>&#x1F4DD; 风格重写</h3>
+            <p>选择目标风格，AI将保持原诗意境进行改写：</p>
+            <div className="rewrite-style-grid">
+              {rewriteStyles.map(s => (
+                <button
+                  key={s}
+                  className={`rewrite-style-btn ${selectedRewriteStyle === s ? 'active' : ''}`}
+                  onClick={() => setSelectedRewriteStyle(s)}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+            <div className="modal-actions">
+              <button className="btn" onClick={rewritePoem} disabled={rewriteLoading || !selectedRewriteStyle}>
+                {rewriteLoading ? '重写中...' : '开始重写'}
+              </button>
+              <button className="btn btn-secondary" onClick={() => setShowRewriteModal(false)}>取消</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 诗词解析弹窗 */}
+      {showAnalyzeModal && (
+        <div className="modal-overlay" onClick={() => setShowAnalyzeModal(false)}>
+          <div className="modal-content analyze-modal" onClick={e => e.stopPropagation()}>
+            <h3>&#x1F50D; 诗词解析</h3>
+            <div className="analyze-result">
+              {poemAnalysis.split('\n').map((line, i) => (
+                <p key={i}>{line}</p>
+              ))}
+            </div>
+            <div className="modal-actions">
+              <button className="btn" onClick={() => setShowAnalyzeModal(false)}>关闭</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 书法风格选择弹窗 */}
+      {showCalligraphyModal && (
+        <div className="modal-overlay" onClick={() => setShowCalligraphyModal(false)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()}>
+            <h3>&#x1F4E5; 书法风格导出</h3>
+            <p>选择书法风格：</p>
+            <div className="calligraphy-style-grid">
+              {Object.entries(calligraphyStyles).map(([key, val]) => (
+                <button
+                  key={key}
+                  className={`calligraphy-style-btn ${selectedCalligraphyStyle === key ? 'active' : ''}`}
+                  style={{ backgroundColor: val.bg, borderColor: val.border, color: val.text }}
+                  onClick={() => setSelectedCalligraphyStyle(key)}
+                >
+                  {val.name}
+                </button>
+              ))}
+            </div>
+            <div className="modal-actions">
+              <button className="btn" onClick={exportCalligraphy}>导出图片</button>
+              <button className="btn btn-secondary" onClick={() => setShowCalligraphyModal(false)}>取消</button>
+            </div>
+          </div>
         </div>
       )}
     </div>

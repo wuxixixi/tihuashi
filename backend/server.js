@@ -226,6 +226,19 @@ const STYLE_PROMPTS = {
   '词-边塞': '词体，边塞风格，苍凉慷慨'
 };
 
+// 风格重写映射
+const REWRITE_STYLE_PROMPTS = {
+  '五言绝句': '改写为五言绝句，四句二十字，符合格律',
+  '七言绝句': '改写为七言绝句，四句二十八字，符合格律',
+  '五言律诗': '改写为五言律诗，八句四十字，符合格律',
+  '七言律诗': '改写为七言律诗，八句五十六字，符合格律',
+  '古体诗': '改写为古体诗，句数、用韵可较自由',
+  '婉约词': '改写为婉约派词作，含蓄细腻',
+  '豪放词': '改写为豪放派词作，开阔激昂',
+  '田园词': '改写为田园山水风格词作，清新自然',
+  '边塞词': '改写为边塞风格词作，苍凉慷慨'
+};
+
 function parseTitleAndPoem(raw) {
   const lines = raw.trim().split(/\r?\n/).map(s => s.trim()).filter(Boolean);
   if (lines.length === 0) return { title: '无题', poem: raw };
@@ -620,6 +633,166 @@ app.post('/api/messages', (req, res) => {
     )
     res.json({ success: true, message: { id, name: name || '匿名用户', content: content.trim(), createdAt } })
   } catch (error) {
+    res.status(500).json({ success: false, error: error.message })
+  }
+})
+
+// ==================== AI 增强功能 API ====================
+
+// 14. 诗词润色
+app.post('/api/polish', async (req, res) => {
+  try {
+    const { poem, title, style } = req.body
+    if (!poem || poem.trim() === '') {
+      return res.status(400).json({ success: false, error: '诗词内容不能为空' })
+    }
+
+    const styleDesc = STYLE_PROMPTS[style] || '古诗词'
+    const prompt = `你是一位精通古诗词的文学专家。请对以下诗词进行润色优化：
+
+【原标题】${title || '无题'}
+【原诗】
+${poem}
+
+【原风格】${styleDesc}
+
+要求：
+1. 保持原意和情感基调不变
+2. 优化用词，使其更加典雅、凝练
+3. 检查格律是否工整，如有问题请修正
+4. 如有典故引用不当，请指出并修正
+
+请按以下格式输出（严格遵循）：
+【润色标题】新标题
+【润色诗词】
+润色后的诗词正文
+【修改说明】
+简要说明修改了什么（2-3句话）`
+
+    const messages = [{ role: 'user', content: prompt }]
+    const result = await callSparkAI(messages)
+    const raw = result.choices?.[0]?.message?.content || ''
+
+    // 解析输出
+    let polishedTitle = title || '无题'
+    let polishedPoem = poem
+    let suggestions = ''
+
+    const titleMatch = raw.match(/【润色标题】\s*(.+)/)
+    const poemMatch = raw.match(/【润色诗词】\s*([\s\S]+?)(?=【修改说明】|$)/)
+    const suggestMatch = raw.match(/【修改说明】\s*([\s\S]+)$/)
+
+    if (titleMatch) polishedTitle = titleMatch[1].trim()
+    if (poemMatch) polishedPoem = poemMatch[1].trim()
+    if (suggestMatch) suggestions = suggestMatch[1].trim()
+
+    res.json({
+      success: true,
+      polishedTitle,
+      polishedPoem,
+      suggestions
+    })
+  } catch (error) {
+    console.error('润色失败:', error)
+    res.status(500).json({ success: false, error: error.message })
+  }
+})
+
+// 15. 风格重写
+app.post('/api/rewrite', async (req, res) => {
+  try {
+    const { poem, title, targetStyle } = req.body
+    if (!poem || poem.trim() === '') {
+      return res.status(400).json({ success: false, error: '诗词内容不能为空' })
+    }
+    if (!targetStyle) {
+      return res.status(400).json({ success: false, error: '请选择目标风格' })
+    }
+
+    const stylePrompt = REWRITE_STYLE_PROMPTS[targetStyle] || targetStyle
+    const prompt = `你是一位精通古诗词的文学专家。请将以下诗词改写为指定风格：
+
+【原标题】${title || '无题'}
+【原诗】
+${poem}
+
+【改写要求】${stylePrompt}
+
+要求：
+1. 保持原诗的意境和情感不变
+2. 严格按照目标风格的格律要求改写
+3. 用词要典雅，符合改写后的风格特点
+4. 标题可适当调整以契合新风格
+
+请按以下格式输出（严格遵循）：
+【新标题】新标题
+【新诗词】
+改写后的诗词正文`
+
+    const messages = [{ role: 'user', content: prompt }]
+    const result = await callSparkAI(messages)
+    const raw = result.choices?.[0]?.message?.content || ''
+
+    // 解析输出
+    let newTitle = title || '无题'
+    let newPoem = poem
+
+    const titleMatch = raw.match(/【新标题】\s*(.+)/)
+    const poemMatch = raw.match(/【新诗词】\s*([\s\S]+)$/)
+
+    if (titleMatch) newTitle = titleMatch[1].trim()
+    if (poemMatch) newPoem = poemMatch[1].trim()
+
+    res.json({
+      success: true,
+      newTitle,
+      newPoem,
+      targetStyle
+    })
+  } catch (error) {
+    console.error('重写失败:', error)
+    res.status(500).json({ success: false, error: error.message })
+  }
+})
+
+// 16. 诗词解析
+app.post('/api/analyze-poem', async (req, res) => {
+  try {
+    const { poem, title } = req.body
+    if (!poem || poem.trim() === '') {
+      return res.status(400).json({ success: false, error: '诗词内容不能为空' })
+    }
+
+    const prompt = `你是一位精通古诗词的文学专家。请对以下诗词进行深度解析：
+
+【标题】${title || '无题'}
+【诗词】
+${poem}
+
+请从以下角度进行详细解析：
+
+1. **典故引用**：诗中引用了哪些典故？出处何在？请逐一说明。如无典故，请说明"本诗未明显引用典故"。
+
+2. **意象分析**：诗中有哪些意象？分别象征什么？营造了怎样的意境？
+
+3. **格律分析**：这是什么体裁（五言绝句、七言律诗等）？格律是否工整？押韵情况如何？
+
+4. **情感表达**：这首诗表达了什么情感？情感基调如何？
+
+5. **艺术评价**：简要评价这首诗的艺术价值和特色。
+
+请用优美的文学语言进行分析，每个部分约100字左右。`
+
+    const messages = [{ role: 'user', content: prompt }]
+    const result = await callSparkAI(messages)
+    const analysis = result.choices?.[0]?.message?.content || '解析失败，请重试'
+
+    res.json({
+      success: true,
+      analysis
+    })
+  } catch (error) {
+    console.error('解析失败:', error)
     res.status(500).json({ success: false, error: error.message })
   }
 })

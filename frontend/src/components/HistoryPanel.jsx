@@ -6,6 +6,9 @@ const API_BASE = ''
 // 常用标签建议
 const SUGGESTED_TAGS = ['山水', '花鸟', '人物', '写意', '工笔', '精品', '收藏', '思乡', '送别', '田园', '边塞', '怀古']
 
+// 重写风格选项
+const rewriteStyles = ['五言绝句', '七言绝句', '五言律诗', '七言律诗', '古体诗', '婉约词', '豪放词', '田园词', '边塞词']
+
 export default function HistoryPanel({ toast, confirm }) {
   const [history, setHistory] = useState([])
   const [search, setSearch] = useState('')
@@ -18,6 +21,14 @@ export default function HistoryPanel({ toast, confirm }) {
   const [editingTags, setEditingTags] = useState(false)
   const [currentTags, setCurrentTags] = useState([])
   const [newTag, setNewTag] = useState('')
+
+  // AI 增强功能状态
+  const [rewriteLoading, setRewriteLoading] = useState(false)
+  const [analyzeLoading, setAnalyzeLoading] = useState(false)
+  const [showRewriteModal, setShowRewriteModal] = useState(false)
+  const [showAnalyzeModal, setShowAnalyzeModal] = useState(false)
+  const [selectedRewriteStyle, setSelectedRewriteStyle] = useState('')
+  const [poemAnalysis, setPoemAnalysis] = useState('')
 
   // 解析 tags 字段
   const parseTags = (tagsStr) => {
@@ -158,6 +169,70 @@ export default function HistoryPanel({ toast, confirm }) {
     navigator.clipboard.writeText(text).then(() => {
       toast.success('已复制到剪贴板')
     }).catch(() => toast.error('复制失败'))
+  }
+
+  // AI 风格重写
+  const rewritePoem = async () => {
+    if (!selectedRewriteStyle || !selectedHistory) return
+    setRewriteLoading(true)
+    try {
+      const res = await fetch(`${API_BASE}/api/rewrite`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          poem: selectedHistory.poem,
+          title: selectedHistory.title,
+          targetStyle: selectedRewriteStyle
+        })
+      })
+      const data = await res.json()
+      if (data.success) {
+        // 更新当前显示的记录
+        setSelectedHistory(prev => ({
+          ...prev,
+          title: data.newTitle,
+          poem: data.newPoem
+        }))
+        // 更新列表中的记录
+        setHistory(prev => prev.map(h =>
+          h.id === selectedHistory.id ? { ...h, title: data.newTitle, poem: data.newPoem } : h
+        ))
+        setShowRewriteModal(false)
+        setSelectedRewriteStyle('')
+        toast.success(`已重写为${selectedRewriteStyle}`)
+      } else {
+        toast.error('重写失败: ' + (data.error || ''))
+      }
+    } catch (err) {
+      toast.error('重写失败，请重试')
+    }
+    setRewriteLoading(false)
+  }
+
+  // AI 诗词解析
+  const analyzePoem = async () => {
+    if (!selectedHistory?.poem) return
+    setAnalyzeLoading(true)
+    try {
+      const res = await fetch(`${API_BASE}/api/analyze-poem`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          poem: selectedHistory.poem,
+          title: selectedHistory.title
+        })
+      })
+      const data = await res.json()
+      if (data.success) {
+        setPoemAnalysis(data.analysis)
+        setShowAnalyzeModal(true)
+      } else {
+        toast.error('解析失败: ' + (data.error || ''))
+      }
+    } catch (err) {
+      toast.error('解析失败，请重试')
+    }
+    setAnalyzeLoading(false)
   }
 
   const navigateDetail = (dir) => {
@@ -451,6 +526,12 @@ export default function HistoryPanel({ toast, confirm }) {
               <button className="icon-btn-labeled" onClick={() => copyPoem(selectedHistory)}>
                 &#x1F4CB; 复制诗词
               </button>
+              <button className="icon-btn-labeled" onClick={() => setShowRewriteModal(true)}>
+                &#x1F4DD; 风格重写
+              </button>
+              <button className="icon-btn-labeled" onClick={analyzePoem} disabled={analyzeLoading}>
+                &#x1F50D; {analyzeLoading ? '解析中...' : 'AI解析'}
+              </button>
               <button
                 className={`icon-btn-labeled ${selectedHistory.favorite ? 'fav-active' : ''}`}
                 onClick={() => toggleFavorite(selectedHistory.id)}
@@ -461,6 +542,50 @@ export default function HistoryPanel({ toast, confirm }) {
 
             <div className="history-detail-date">
               创作时间：{new Date(selectedHistory.createdAt).toLocaleString('zh-CN')}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 风格重写弹窗 */}
+      {showRewriteModal && (
+        <div className="modal-overlay" onClick={() => setShowRewriteModal(false)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()}>
+            <h3>&#x1F4DD; 风格重写</h3>
+            <p>选择目标风格，AI将保持原诗意境进行改写：</p>
+            <div className="rewrite-style-grid">
+              {rewriteStyles.map(s => (
+                <button
+                  key={s}
+                  className={`rewrite-style-btn ${selectedRewriteStyle === s ? 'active' : ''}`}
+                  onClick={() => setSelectedRewriteStyle(s)}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+            <div className="modal-actions">
+              <button className="btn" onClick={rewritePoem} disabled={rewriteLoading || !selectedRewriteStyle}>
+                {rewriteLoading ? '重写中...' : '开始重写'}
+              </button>
+              <button className="btn btn-secondary" onClick={() => setShowRewriteModal(false)}>取消</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 诗词解析弹窗 */}
+      {showAnalyzeModal && (
+        <div className="modal-overlay" onClick={() => setShowAnalyzeModal(false)}>
+          <div className="modal-content analyze-modal" onClick={e => e.stopPropagation()}>
+            <h3>&#x1F50D; 诗词解析</h3>
+            <div className="analyze-result">
+              {poemAnalysis.split('\n').map((line, i) => (
+                <p key={i}>{line}</p>
+              ))}
+            </div>
+            <div className="modal-actions">
+              <button className="btn" onClick={() => setShowAnalyzeModal(false)}>关闭</button>
             </div>
           </div>
         </div>
