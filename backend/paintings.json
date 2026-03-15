@@ -1,0 +1,202 @@
+[
+  {
+    "id": "p001",
+    "name": "富春山居图",
+    "artist": "黄公望",
+    "dynasty": "元代",
+    "school": "山水画",
+    "category": "山水",
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7d/Dwelling_in_the_Fuchun_Mountains_-_Full_Scroll.jpg/1280px-Dwelling_in_the_Fuchun_Mountains_-_Full_Scroll.jpg",
+    "description": "中国十大传世名画之一，以浙江富春江为背景，全图用墨淡雅，山和水的布置疏密得当，墨色浓淡干湿并用，极富于变化。"
+  },
+  {
+    "id": "p002",
+    "name": "清明上河图",
+    "artist": "张择端",
+    "dynasty": "北宋",
+    "school": "风俗画",
+    "category": "人物",
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/50/Along_the_River_During_the_Qingming_Festival_%28Qing_Court_Version%29.jpg/1280px-Along_the_River_During_the_Qingming_Festival_%28Qing_Court_Version%29.jpg",
+    "description": "中国十大传世名画之一，描绘北宋都城汴京的繁华景象，展现了当时社会各阶层的生活状态。"
+  },
+  {
+    "id": "p003",
+    "name": "千里江山图",
+    "artist": "王希孟",
+    "dynasty": "北宋",
+    "school": "青绿山水",
+    "category": "山水",
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a5/A_Thousand_Li_of_Rivers_and_Mountains.jpg/1280px-A_Thousand_Li_of_Rivers_and_Mountains.jpg",
+    "description": "青绿山水画的代表作，以长卷形式描绘连绵起伏的群山和浩渺无际的江河，气势恢宏。"
+  },
+  {
+    "id": "p004",
+    "name": "韩熙载夜宴图",
+    "artist": "顾闳中",
+    "dynasty": "五代",
+    "school": "人物画",
+    "category": "人物",
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/59/The_Night_Entertainments_of_Han_Xizai.jpg/1280px-The_Night_Entertainments_of_Han_Xizai.jpg",
+    "description": "描绘南唐大臣韩熙载家宴的场景，人物刻画细腻，生动展现了当时的贵族生活。"
+  },
+  {
+    "id": "p005",
+    "name": "五牛图",
+    "artist": "韩滉",
+    "dynasty": "唐代",
+    "school": "花鸟画",
+    "category": "花鸟",
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8c/Five_Oxen_by_Han_Huang.jpg/1280px-Five_Oxen_by_Han_Huang.jpg",
+    "description": "现存最早的纸本中国画，五头牛形态各异，用笔精妙，体现了唐代绘画的高超技艺。"
+  },
+  {
+    "id": "p006",
+    "name": "洛神赋图",
+    "artist": "顾恺之",
+    "dynasty": "东晋",
+    "school": "人物画",
+    "category": "人物",
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f8/Nymph_of_the_Luo_River_-_Google_Art_Project.jpg/1280px-Nymph_of_the_Luo_River_-_Google_Art_Project.jpg",
+    "description": "根据曹植《洛神赋》创作，描绘人神相恋的故事，线条流畅飘逸，是中国古典绘画的杰作。"
+  },
+  {
+    "id": "p007",
+    "name": "步辇图",
+    "artist": "阎立本",
+    "dynasty": "唐代",
+    "school": "人物画",
+    "category": "人物",
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0b/Bunian_Tu.jpg/1280px-Bunian_Tu.jpg",
+    "description": "描绘唐太宗接见吐蕃使者的场景，是汉藏民族团结的历史见证，人物形象生动传神。"
+  },
+  {
+    "id": "p008",
+    "name": "唐宫仕女图",
+    "artist": "张萱、周昉",
+    "dynasty": "唐代",
+    "school": "人物画",
+    "category": "人物",
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/32/Ladies_Wearing_Flowers_by_Zhou_Fang.jpg/800px-Ladies_Wearing_Flowers_by_Zhou_Fang.jpg",
+    "description": "描绘唐代宫廷女性的生活场景，展现了盛唐时期雍容华贵的审美风尚。"
+  },
+  {
+    "id": "p009",
+    "name": "写生珍禽图",
+    "artist": "黄筌",
+    "dynasty": "五代",
+    "school": "花鸟画",
+    "category": "花鸟",
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2a/Huang_Quan_-_Sketches_from_Nature.jpg/800px-Huang_Quan_-_Sketches_from_Nature.jpg",
+    "description": "工笔花鸟画的典范之作，描绘各种珍禽异鸟，笔法细腻，设色艳丽。"
+  },
+  {
+    "id": "p010",
+    "name": "溪山行旅图",
+    "artist": "范宽",
+    "dynasty": "北宋",
+    "school": "山水画",
+    "category": "山水",
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/86/Travelers_Amid_Mountains_and_Streams.jpg/800px-Travelers_Amid_Mountains_and_Streams.jpg",
+    "description": "北宋山水画的代表作，以雄浑的笔法描绘高山大川，气势磅礴，被誉为'宋画第一'。"
+  },
+  {
+    "id": "p011",
+    "name": "早春图",
+    "artist": "郭熙",
+    "dynasty": "北宋",
+    "school": "山水画",
+    "category": "山水",
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/37/Guo_Xi_-_Early_Spring.jpg/800px-Guo_Xi_-_Early_Spring.jpg",
+    "description": "描绘早春时节山间的景象，运用'三远法'构图，山石用'云头皴'，意境深远。"
+  },
+  {
+    "id": "p012",
+    "name": "万壑松风图",
+    "artist": "李唐",
+    "dynasty": "南宋",
+    "school": "山水画",
+    "category": "山水",
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7d/Li_Tang_-_Wind_in_Pines_Amid_a_Myriad_Valleys.jpg/800px-Li_Tang_-_Wind_in_Pines_Amid_a_Myriad_Valleys.jpg",
+    "description": "描绘深山幽谷中松涛阵阵的景象，开创了'斧劈皴'技法，对后世影响深远。"
+  },
+  {
+    "id": "p013",
+    "name": "鹊华秋色图",
+    "artist": "赵孟頫",
+    "dynasty": "元代",
+    "school": "山水画",
+    "category": "山水",
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/78/Zhao_Mengfu_-_Autumn_Colors_on_the_Que_and_Hua_Mountains.jpg/1280px-Zhao_Mengfu_-_Autumn_Colors_on_the_Que_and_Hua_Mountains.jpg",
+    "description": "描绘济南鹊山和华不注山的秋景，笔墨古雅，体现了文人画的审美追求。"
+  },
+  {
+    "id": "p014",
+    "name": "渔庄秋霁图",
+    "artist": "倪瓒",
+    "dynasty": "元代",
+    "school": "山水画",
+    "category": "山水",
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0e/Ni_Zan_-_The_Rongxi_Studio.jpg/800px-Ni_Zan_-_The_Rongxi_Studio.jpg",
+    "description": "元四家之一倪瓒的代表作，以简淡的笔墨描绘江南水乡，意境萧疏淡远。"
+  },
+  {
+    "id": "p015",
+    "name": "青卞隐居图",
+    "artist": "王蒙",
+    "dynasty": "元代",
+    "school": "山水画",
+    "category": "山水",
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e9/Wang_Meng_-_Dwelling_in_Seclusion_in_the_Summer_Mountains.jpg/800px-Wang_Meng_-_Dwelling_in_Seclusion_in_the_Summer_Mountains.jpg",
+    "description": "元四家之一王蒙的代表作，以繁密的笔法描绘山居景色，层次丰富。"
+  },
+  {
+    "id": "p016",
+    "name": "墨葡萄图",
+    "artist": "徐渭",
+    "dynasty": "明代",
+    "school": "写意花鸟",
+    "category": "花鸟",
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5d/Xu_Wei_-_Grapes.jpg/800px-Xu_Wei_-_Grapes.jpg",
+    "description": "大写意花鸟画的杰作，以狂放的笔触描绘葡萄，抒发了画家怀才不遇的感慨。"
+  },
+  {
+    "id": "p017",
+    "name": "庐山高图",
+    "artist": "沈周",
+    "dynasty": "明代",
+    "school": "山水画",
+    "category": "山水",
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3e/Shen_Zhou_-_Lofty_Mt_Lu.jpg/800px-Shen_Zhou_-_Lofty_Mt_Lu.jpg",
+    "description": "吴门画派创始人沈周的代表作，以庐山象征老师的崇高品德，笔墨苍劲有力。"
+  },
+  {
+    "id": "p018",
+    "name": "秋风纨扇图",
+    "artist": "唐寅",
+    "dynasty": "明代",
+    "school": "人物画",
+    "category": "人物",
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7b/Tang_Yin_-_Lady_Holding_a_Fan.jpg/600px-Tang_Yin_-_Lady_Holding_a_Fan.jpg",
+    "description": "江南才子唐寅的作品，描绘仕女执扇的情景，寓意深远，笔墨秀雅。"
+  },
+  {
+    "id": "p019",
+    "name": "荷花水鸟图",
+    "artist": "朱耷（八大山人）",
+    "dynasty": "清代",
+    "school": "写意花鸟",
+    "category": "花鸟",
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6b/Bada_Shanren_-_Lotus.jpg/800px-Bada_Shanren_-_Lotus.jpg",
+    "description": "清初四僧之一八大山人的作品，以简练的笔墨描绘荷花与水鸟，意境孤高。"
+  },
+  {
+    "id": "p020",
+    "name": "竹石图",
+    "artist": "郑燮（郑板桥）",
+    "dynasty": "清代",
+    "school": "写意花鸟",
+    "category": "花鸟",
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8a/Zheng_Xie_-_Bamboo_and_Rock.jpg/800px-Zheng_Xie_-_Bamboo_and_Rock.jpg",
+    "description": "扬州八怪之一郑板桥的代表作，以竹喻人，表达了清高正直的品格。"
+  }
+]

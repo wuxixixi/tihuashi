@@ -145,6 +145,28 @@ db.exec(`
     name TEXT,
     content TEXT NOT NULL,
     createdAt TEXT
+  );
+
+  CREATE TABLE IF NOT EXISTS paintings (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    artist TEXT,
+    dynasty TEXT,
+    school TEXT,
+    category TEXT,
+    imageUrl TEXT NOT NULL,
+    description TEXT,
+    width INTEGER,
+    height INTEGER,
+    createdAt TEXT
+  );
+
+  CREATE TABLE IF NOT EXISTS gallery_favorites (
+    id TEXT PRIMARY KEY,
+    paintingId TEXT NOT NULL,
+    sessionId TEXT NOT NULL,
+    createdAt TEXT,
+    UNIQUE(paintingId, sessionId)
   )
 `);
 
@@ -908,6 +930,202 @@ ${poem}
     })
   } catch (error) {
     console.error('解析失败:', error)
+    res.status(500).json({ success: false, error: error.message })
+  }
+})
+
+// ==================== 画廊功能 ====================
+
+// 初始化画作数据
+function initPaintings() {
+  const paintingsPath = path.join(__dirname, 'paintings.json')
+  if (!fs.existsSync(paintingsPath)) return
+
+  try {
+    const existing = db.prepare('SELECT COUNT(*) as cnt FROM paintings').get()
+    if (existing.cnt > 0) return // 已有数据，不重复初始化
+
+    const paintings = JSON.parse(fs.readFileSync(paintingsPath, 'utf-8'))
+    const insert = db.prepare(`
+      INSERT INTO paintings (id, name, artist, dynasty, school, category, imageUrl, description, createdAt)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `)
+    const tx = db.transaction((items) => {
+      for (const p of items) {
+        insert.run(
+          p.id,
+          p.name,
+          p.artist || '',
+          p.dynasty || '',
+          p.school || '',
+          p.category || '',
+          p.imageUrl,
+          p.description || '',
+          new Date().toISOString()
+        )
+      }
+    })
+    tx(paintings)
+    console.log(`已初始化 ${paintings.length} 幅画作`)
+  } catch (e) {
+    console.error('初始化画作失败:', e.message)
+  }
+}
+initPaintings()
+
+// 17. 获取画作列表
+app.get('/api/gallery', (req, res) => {
+  try {
+    const { search, dynasty, category, page = 1, pageSize = 12, sessionId } = req.query
+    const pageNum = Math.max(1, parseInt(page))
+    const size = Math.min(50, Math.max(1, parseInt(pageSize) || 12))
+    const offset = (pageNum - 1) * size
+
+    let where = []
+    let params = []
+
+    if (search) {
+      where.push('(name LIKE ? OR artist LIKE ? OR dynasty LIKE ?)')
+      const q = `%${search}%`
+      params.push(q, q, q)
+    }
+    if (dynasty) {
+      where.push('dynasty = ?')
+      params.push(dynasty)
+    }
+    if (category) {
+      where.push('category = ?')
+      params.push(category)
+    }
+
+    const whereClause = where.length > 0 ? `WHERE ${where.join(' AND ')}` : ''
+
+    const countSql = `SELECT COUNT(*) as total FROM paintings ${whereClause}`
+    const { total } = db.prepare(countSql).get(...params)
+
+    const dataSql = `SELECT * FROM paintings ${whereClause} ORDER BY createdAt DESC LIMIT ? OFFSET ?`
+    const paintings = db.prepare(dataSql).all(...params, size, offset)
+
+    // 获取用户收藏状态
+    let favorites = []
+    if (sessionId) {
+      const favRows = db.prepare('SELECT paintingId FROM gallery_favorites WHERE sessionId = ?').all(sessionId)
+      favorites = favRows.map(r => r.paintingId)
+    }
+
+    const paintingsWithFav = paintings.map(p => ({
+      ...p,
+      isFavorite: favorites.includes(p.id)
+    }))
+
+    // 获取所有朝代和分类（用于筛选）
+    const dynasties = db.prepare('SELECT DISTINCT dynasty FROM paintings WHERE dynasty != "" ORDER BY dynasty').all().map(r => r.dynasty)
+    const categories = db.prepare('SELECT DISTINCT category FROM paintings WHERE category != "" ORDER BY category').all().map(r => r.category)
+
+    res.json({
+      success: true,
+      paintings: paintingsWithFav,
+      filters: { dynasties, categories },
+      pagination: {
+        page: pageNum,
+        pageSize: size,
+        total,
+        totalPages: Math.ceil(total / size)
+      }
+    })
+  } catch (error) {
+    console.error('获取画廊失败:', error)
+    res.status(500).json({ success: false, error: error.message })
+  }
+})
+
+// 18. 获取画作详情
+app.get('/api/gallery/:id', (req, res) => {
+  try {
+    const { sessionId } = req.query
+    const painting = db.prepare('SELECT * FROM paintings WHERE id = ?').get(req.params.id)
+    if (!painting) {
+      return res.status(404).json({ success: false, error: '画作不存在' })
+    }
+
+    let isFavorite = false
+    if (sessionId) {
+      const fav = db.prepare('SELECT * FROM gallery_favorites WHERE paintingId = ? AND sessionId = ?').get(req.params.id, sessionId)
+      isFavorite = !!fav
+    }
+
+    res.json({ success: true, painting: { ...painting, isFavorite } })
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message })
+  }
+})
+
+// 19. 收藏/取消收藏画作
+app.post('/api/gallery/:id/favorite', (req, res) => {
+  try {
+    const { sessionId } = req.body
+    if (!sessionId) {
+      return res.status(400).json({ success: false, error: '缺少会话ID' })
+    }
+
+    const painting = db.prepare('SELECT * FROM paintings WHERE id = ?').get(req.params.id)
+    if (!painting) {
+      return res.status(404).json({ success: false, error: '画作不存在' })
+    }
+
+    const existing = db.prepare('SELECT * FROM gallery_favorites WHERE paintingId = ? AND sessionId = ?').get(req.params.id, sessionId)
+
+    if (existing) {
+      // 取消收藏
+      db.prepare('DELETE FROM gallery_favorites WHERE paintingId = ? AND sessionId = ?').run(req.params.id, sessionId)
+      res.json({ success: true, isFavorite: false, message: '已取消收藏' })
+    } else {
+      // 添加收藏
+      db.prepare('INSERT INTO gallery_favorites (id, paintingId, sessionId, createdAt) VALUES (?, ?, ?, ?)').run(
+        uuidv4(),
+        req.params.id,
+        sessionId,
+        new Date().toISOString()
+      )
+      res.json({ success: true, isFavorite: true, message: '已收藏' })
+    }
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message })
+  }
+})
+
+// 20. 获取收藏的画作
+app.get('/api/gallery/favorites/:sessionId', (req, res) => {
+  try {
+    const { page = 1, pageSize = 12 } = req.query
+    const pageNum = Math.max(1, parseInt(page))
+    const size = Math.min(50, Math.max(1, parseInt(pageSize) || 12))
+    const offset = (pageNum - 1) * size
+
+    const countSql = `SELECT COUNT(*) as total FROM gallery_favorites WHERE sessionId = ?`
+    const { total } = db.prepare(countSql).get(req.params.sessionId)
+
+    const dataSql = `
+      SELECT p.*, gf.createdAt as favoritedAt
+      FROM paintings p
+      JOIN gallery_favorites gf ON p.id = gf.paintingId
+      WHERE gf.sessionId = ?
+      ORDER BY gf.createdAt DESC
+      LIMIT ? OFFSET ?
+    `
+    const paintings = db.prepare(dataSql).all(req.params.sessionId, size, offset)
+
+    res.json({
+      success: true,
+      paintings,
+      pagination: {
+        page: pageNum,
+        pageSize: size,
+        total,
+        totalPages: Math.ceil(total / size)
+      }
+    })
+  } catch (error) {
     res.status(500).json({ success: false, error: error.message })
   }
 })

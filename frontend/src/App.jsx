@@ -4,6 +4,7 @@ import { useConfirm } from './components/ConfirmDialog'
 import UploadPanel from './components/UploadPanel'
 import PoemPanel from './components/PoemPanel'
 import HistoryPanel from './components/HistoryPanel'
+import GalleryPanel from './components/GalleryPanel'
 import EmptyState from './components/EmptyState'
 import ThemeSwitcher from './components/ThemeSwitcher'
 import useKeyboardShortcuts from './hooks/useKeyboardShortcuts'
@@ -179,6 +180,12 @@ function App() {
           创作
         </button>
         <button
+          className={`tab ${activeTab === 'gallery' ? 'active' : ''}`}
+          onClick={() => setActiveTab('gallery')}
+        >
+          名画赏析
+        </button>
+        <button
           className={`tab ${activeTab === 'history' ? 'active' : ''}`}
           onClick={() => setActiveTab('history')}
         >
@@ -350,6 +357,24 @@ function App() {
 
       {activeTab === 'history' && (
         <HistoryPanel toast={toast} confirm={confirm} />
+      )}
+
+      {activeTab === 'gallery' && (
+        <GalleryPanel
+          toast={toast}
+          onSelectPainting={(painting) => {
+            // 从画廊选择画作后，跳转到创作页面
+            setImage(painting.imageUrl)
+            setImagePath('') // 外部 URL，不需要本地路径
+            // 使用画作描述作为赏析内容
+            const galleryAnalysis = `【${painting.name}】\n${painting.artist ? `画家：${painting.artist}\n` : ''}${painting.dynasty ? `朝代：${painting.dynasty}\n` : ''}${painting.school ? `流派：${painting.school}\n` : ''}\n${painting.description || '暂无赏析'}`
+            setAnalysis(galleryAnalysis)
+            setFeeling('')
+            setGenre(painting.category || '')
+            setActiveTab('create')
+            toast.success(`已选择《${painting.name}》，开始创作吧！`)
+          }}
+        />
       )}
 
       <footer className="app-footer">
