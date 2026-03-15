@@ -110,6 +110,37 @@ body {
   transition: color 0.3s;
 }
 
+/* GitHub 链接 */
+.github-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--cardBg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  transition: all 0.3s;
+  text-decoration: none;
+  flex-shrink: 0;
+}
+
+.github-link:hover {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+  transform: scale(1.1);
+}
+
+/* 公司标语 */
+.header-slogan {
+  margin-top: 12px;
+  font-size: 0.85rem;
+  color: #888;
+  letter-spacing: 2px;
+}
+
 /* ==================== Theme Switcher ==================== */
 .theme-switcher {
   display: flex;
