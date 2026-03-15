@@ -117,6 +117,120 @@ const OMNI_CONFIG = {
   model: process.env.VISION_MODEL || 'Doubao-1.5-vision-pro-32k'
 };
 
+// ==================== 多模型配置 ====================
+
+// 可用的文本模型列表
+const TEXT_MODELS = {
+  'gpt-4o-mini': { name: 'GPT-4o Mini', provider: 'openai', description: '快速高效，性价比高' },
+  'gpt-4o': { name: 'GPT-4o', provider: 'openai', description: '最强大，创作质量最高' },
+  'claude-3-5-sonnet': { name: 'Claude 3.5 Sonnet', provider: 'anthropic', description: '文学创作能力强' },
+  'deepseek-chat': { name: 'DeepSeek Chat', provider: 'deepseek', description: '中文理解出色' },
+  'qwen-plus': { name: '通义千问 Plus', provider: 'alibaba', description: '古诗词专长' },
+  'doubao-pro': { name: '豆包 Pro', provider: 'bytedance', description: '国产大模型' },
+  'gpt-5-mini': { name: 'GPT-5 Mini', provider: 'openai', description: '默认模型' }
+};
+
+// 可用的视觉模型列表
+const VISION_MODELS = {
+  'gpt-4o': { name: 'GPT-4o', provider: 'openai', description: '最强图像理解' },
+  'gpt-4o-mini': { name: 'GPT-4o Mini', provider: 'openai', description: '快速图像分析' },
+  'claude-3-5-sonnet': { name: 'Claude 3.5 Sonnet', provider: 'anthropic', description: '细腻的艺术感知' },
+  'qwen-vl-plus': { name: '通义千问 VL', provider: 'alibaba', description: '中国画专长' },
+  'Doubao-1.5-vision-pro-32k': { name: '豆包视觉 Pro', provider: 'bytedance', description: '默认视觉模型' }
+};
+
+// 当前选中的模型（可动态切换）
+let currentTextModel = process.env.DMX_MODEL || 'gpt-5-mini';
+let currentVisionModel = process.env.VISION_MODEL || 'Doubao-1.5-vision-pro-32k';
+
+// ==================== 提示词模板管理 ====================
+
+// 默认提示词模板
+const DEFAULT_TEMPLATES = {
+  analysis: {
+    id: 'default-analysis',
+    name: '默认赏析模板',
+    template: `你是一位中国画鉴赏专家。请结合本图，从专业角度对这幅中国画进行赏析评论，需涵盖：
+1. 题材与内容：画作描绘了什么主题与物象？
+2. 构图与布局：画面构图、疏密、留白有何特点？
+3. 技法与风格：用笔、用墨、设色等技法与风格特征？
+4. 意境与情感：画作传达的意境与情感？
+5. 艺术价值：简要评价其艺术价值。
+
+要求：语言专业、优美流畅，字数严格控制在 200-300 字。
+
+最后请另起一行，以"【流派】"开头，写出该画所属的流派/画科（如：山水画、花鸟画、人物画、工笔画、写意画等），只写流派名称。`
+  },
+  poem: {
+    id: 'default-poem',
+    name: '默认诗词模板',
+    template: `你是一位擅长题画诗/词的诗人。请根据下面的「画作赏析」与「用户感悟」，为这幅中国画创作一首题画作品。
+
+【画作赏析】
+{analysis}
+
+【用户感悟】
+{userFeeling}
+
+要求：
+1. 体裁与形式：{style}
+2. 必须给出一个切题的标题（单独一行，如「题某某图」），标题要与画意、赏析、感悟契合
+3. 正文内容必须紧扣上述赏析与感悟，意境一致，不可泛泛而谈
+4. 仅输出：第一行为标题，空一行后为正文（可含简短创作说明），不要其他前缀或解释`
+  },
+  polish: {
+    id: 'default-polish',
+    name: '默认润色模板',
+    template: `你是一位精通古诗词的文学专家。请对以下诗词进行润色优化：
+
+【原标题】{title}
+【原诗】
+{poem}
+
+【原风格】{style}
+
+要求：
+1. 保持原意和情感基调不变
+2. 优化用词，使其更加典雅、凝练
+3. 检查格律是否工整，如有问题请修正
+4. 如有典故引用不当，请指出并修正
+
+请按以下格式输出（严格遵循）：
+【润色标题】新标题
+【润色诗词】
+润色后的诗词正文
+【修改说明】
+简要说明修改了什么（2-3句话）`
+  }
+};
+
+// 从数据库加载自定义模板
+function loadTemplates() {
+  try {
+    const rows = db.prepare('SELECT * FROM prompt_templates').all();
+    const templates = { ...DEFAULT_TEMPLATES };
+    for (const row of rows) {
+      templates[row.id] = {
+        id: row.id,
+        name: row.name,
+        template: row.template,
+        isCustom: true
+      };
+    }
+    return templates;
+  } catch (e) {
+    return DEFAULT_TEMPLATES;
+  }
+}
+
+// 保存自定义模板
+function saveTemplate(id, name, template) {
+  db.prepare(`
+    INSERT OR REPLACE INTO prompt_templates (id, name, template, createdAt, updatedAt)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(id, name, template, new Date().toISOString(), new Date().toISOString());
+}
+
 // ==================== SQLite 数据库 ====================
 const DB_PATH = process.env.DB_PATH || path.join(__dirname, 'moyun.db');
 const db = new Database(DB_PATH);
@@ -167,6 +281,20 @@ db.exec(`
     sessionId TEXT NOT NULL,
     createdAt TEXT,
     UNIQUE(paintingId, sessionId)
+  );
+
+  CREATE TABLE IF NOT EXISTS prompt_templates (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    template TEXT NOT NULL,
+    createdAt TEXT,
+    updatedAt TEXT
+  );
+
+  CREATE TABLE IF NOT EXISTS user_settings (
+    key TEXT PRIMARY KEY,
+    value TEXT,
+    updatedAt TEXT
   )
 `);
 
@@ -198,7 +326,7 @@ migrateFromJson();
 
 // ==================== AI 调用 ====================
 
-async function callSparkAI(messages) {
+async function callSparkAI(messages, model = null) {
   try {
     const url = `${DMX_CONFIG.baseUrl}/chat/completions`;
     const headers = {
@@ -206,25 +334,27 @@ async function callSparkAI(messages) {
       'Authorization': DMX_CONFIG.apiKey,
       'Content-Type': 'application/json'
     };
-    const payload = { model: DMX_CONFIG.model, messages };
-    console.log('DMXAPI Request URL:', url);
+    const useModel = model || currentTextModel || DMX_CONFIG.model;
+    const payload = { model: useModel, messages };
+    console.log('AI Request - Model:', useModel, 'URL:', url);
     const response = await axios.post(url, payload, { headers });
-    console.log('DMXAPI Response:', response.data?.choices?.[0]?.message ? 'OK' : response.data);
+    console.log('AI Response:', response.data?.choices?.[0]?.message ? 'OK' : response.data);
     return response.data;
   } catch (error) {
-    console.error('DMXAPI 调用失败:', error.response?.data || error.message);
+    console.error('AI 调用失败:', error.response?.data || error.message);
     throw error;
   }
 }
 
-async function callQwenOmniImageToText(imageDataUrl, textPrompt) {
+async function callQwenOmniImageToText(imageDataUrl, textPrompt, model = null) {
   const url = OMNI_CONFIG.chatUrl;
+  const useModel = model || currentVisionModel || OMNI_CONFIG.model;
   const headers = {
     'Content-Type': 'application/json',
     'Authorization': OMNI_CONFIG.apiKey
   };
   const payload = {
-    model: OMNI_CONFIG.model,
+    model: useModel,
     messages: [{
       role: 'user',
       content: [
@@ -235,7 +365,7 @@ async function callQwenOmniImageToText(imageDataUrl, textPrompt) {
     stream: true
   };
 
-  console.log('Doubao Vision 请求:', url, 'model:', OMNI_CONFIG.model);
+  console.log('Vision AI 请求:', url, 'model:', useModel);
   let response;
   try {
     response = await axios.post(url, payload, {
@@ -1129,6 +1259,125 @@ app.get('/api/gallery/favorites/:sessionId', (req, res) => {
     res.status(500).json({ success: false, error: error.message })
   }
 })
+
+// ==================== 模型和模板管理 API ====================
+
+// 21. 获取可用模型列表
+app.get('/api/models', (req, res) => {
+  res.json({
+    success: true,
+    textModels: TEXT_MODELS,
+    visionModels: VISION_MODELS,
+    currentTextModel,
+    currentVisionModel
+  })
+})
+
+// 22. 切换模型
+app.post('/api/models/switch', (req, res) => {
+  try {
+    const { textModel, visionModel } = req.body
+
+    if (textModel && TEXT_MODELS[textModel]) {
+      currentTextModel = textModel
+      // 保存到数据库
+      db.prepare('INSERT OR REPLACE INTO user_settings (key, value, updatedAt) VALUES (?, ?, ?)')
+        .run('textModel', textModel, new Date().toISOString())
+    }
+
+    if (visionModel && VISION_MODELS[visionModel]) {
+      currentVisionModel = visionModel
+      db.prepare('INSERT OR REPLACE INTO user_settings (key, value, updatedAt) VALUES (?, ?, ?)')
+        .run('visionModel', visionModel, new Date().toISOString())
+    }
+
+    res.json({
+      success: true,
+      currentTextModel,
+      currentVisionModel,
+      message: '模型已切换'
+    })
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message })
+  }
+})
+
+// 23. 获取提示词模板列表
+app.get('/api/templates', (req, res) => {
+  try {
+    const templates = loadTemplates()
+    res.json({ success: true, templates })
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message })
+  }
+})
+
+// 24. 保存自定义模板
+app.post('/api/templates', (req, res) => {
+  try {
+    const { id, name, template } = req.body
+
+    if (!id || !name || !template) {
+      return res.status(400).json({ success: false, error: '缺少必要参数' })
+    }
+
+    saveTemplate(id, name, template)
+    res.json({ success: true, message: '模板保存成功' })
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message })
+  }
+})
+
+// 25. 删除自定义模板
+app.delete('/api/templates/:id', (req, res) => {
+  try {
+    // 不允许删除默认模板
+    if (DEFAULT_TEMPLATES[req.params.id]) {
+      return res.status(400).json({ success: false, error: '不能删除默认模板' })
+    }
+
+    db.prepare('DELETE FROM prompt_templates WHERE id = ?').run(req.params.id)
+    res.json({ success: true, message: '模板已删除' })
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message })
+  }
+})
+
+// 26. 重置模板到默认
+app.post('/api/templates/:id/reset', (req, res) => {
+  try {
+    const defaultTemplate = DEFAULT_TEMPLATES[req.params.id]
+    if (!defaultTemplate) {
+      return res.status(404).json({ success: false, error: '模板不存在' })
+    }
+
+    // 删除自定义版本
+    db.prepare('DELETE FROM prompt_templates WHERE id = ?').run(req.params.id)
+    res.json({ success: true, template: defaultTemplate, message: '模板已重置' })
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message })
+  }
+})
+
+// 初始化时加载用户设置
+function loadUserSettings() {
+  try {
+    const textModelSetting = db.prepare('SELECT value FROM user_settings WHERE key = ?').get('textModel')
+    const visionModelSetting = db.prepare('SELECT value FROM user_settings WHERE key = ?').get('visionModel')
+
+    if (textModelSetting && TEXT_MODELS[textModelSetting.value]) {
+      currentTextModel = textModelSetting.value
+    }
+    if (visionModelSetting && VISION_MODELS[visionModelSetting.value]) {
+      currentVisionModel = visionModelSetting.value
+    }
+
+    console.log('已加载用户设置 - 文本模型:', currentTextModel, '视觉模型:', currentVisionModel)
+  } catch (e) {
+    console.log('加载用户设置失败，使用默认模型')
+  }
+}
+loadUserSettings()
 
 // 仅直接运行时启动服务
 if (require.main === module) {

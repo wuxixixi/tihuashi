@@ -5,6 +5,7 @@ import UploadPanel from './components/UploadPanel'
 import PoemPanel from './components/PoemPanel'
 import HistoryPanel from './components/HistoryPanel'
 import GalleryPanel from './components/GalleryPanel'
+import SettingsPanel from './components/SettingsPanel'
 import EmptyState from './components/EmptyState'
 import ThemeSwitcher from './components/ThemeSwitcher'
 import useKeyboardShortcuts from './hooks/useKeyboardShortcuts'
@@ -192,6 +193,12 @@ function App() {
           历史记录
         </button>
         <button
+          className={`tab ${activeTab === 'settings' ? 'active' : ''}`}
+          onClick={() => setActiveTab('settings')}
+        >
+          设置
+        </button>
+        <button
           className={`tab ${activeTab === 'about' ? 'active' : ''}`}
           onClick={() => setActiveTab('about')}
         >
@@ -375,6 +382,10 @@ function App() {
             toast.success(`已选择《${painting.name}》，开始创作吧！`)
           }}
         />
+      )}
+
+      {activeTab === 'settings' && (
+        <SettingsPanel toast={toast} />
       )}
 
       <footer className="app-footer">

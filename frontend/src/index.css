@@ -2916,3 +2916,280 @@ button:focus-visible {
     width: 100%;
   }
 }
+
+/* ==================== 设置页面样式 ==================== */
+
+.settings-section {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.settings-section h2 {
+  font-family: 'Ma Shan Zheng', cursive;
+  font-size: 2rem;
+  color: var(--primary);
+  text-align: center;
+  margin-bottom: 8px;
+}
+
+.settings-intro {
+  text-align: center;
+  color: var(--secondary);
+  font-size: 1rem;
+  margin-bottom: 25px;
+}
+
+.settings-tabs {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 25px;
+  justify-content: center;
+}
+
+.settings-tab {
+  padding: 12px 30px;
+  border: 2px solid var(--border);
+  border-radius: 25px;
+  background: var(--paper);
+  cursor: pointer;
+  font-size: 1rem;
+  font-family: 'Noto Serif SC', serif;
+  transition: all 0.3s;
+}
+
+.settings-tab:hover {
+  border-color: var(--secondary);
+}
+
+.settings-tab.active {
+  background: linear-gradient(135deg, var(--primary), var(--secondary));
+  color: white;
+  border-color: transparent;
+}
+
+.settings-content {
+  background: var(--paper);
+  border-radius: 16px;
+  padding: 25px;
+  border: 1px solid var(--border);
+}
+
+.settings-loading {
+  text-align: center;
+  padding: 60px 20px;
+}
+
+.settings-group {
+  margin-bottom: 30px;
+}
+
+.settings-group:last-child {
+  margin-bottom: 0;
+}
+
+.settings-group h3 {
+  color: var(--primary);
+  font-size: 1.2rem;
+  margin-bottom: 8px;
+}
+
+.settings-desc {
+  color: #666;
+  font-size: 0.9rem;
+  margin-bottom: 15px;
+}
+
+/* 模型卡片网格 */
+.model-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.model-card {
+  position: relative;
+  padding: 15px;
+  border: 2px solid var(--border);
+  border-radius: 12px;
+  background: var(--cardBg);
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.model-card:hover {
+  border-color: var(--secondary);
+  transform: translateY(-2px);
+}
+
+.model-card.active {
+  border-color: var(--primary);
+  background: linear-gradient(135deg, rgba(139, 69, 19, 0.05), rgba(160, 82, 45, 0.05));
+}
+
+.model-name {
+  font-weight: 600;
+  color: var(--primary);
+  margin-bottom: 5px;
+}
+
+.model-desc {
+  font-size: 0.85rem;
+  color: #666;
+}
+
+.model-check {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 24px;
+  height: 24px;
+  background: var(--primary);
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.9rem;
+}
+
+/* 模板列表 */
+.templates-list {
+  display: grid;
+  gap: 15px;
+}
+
+.template-card {
+  background: var(--cardBg);
+  border-radius: 12px;
+  padding: 18px;
+  border: 1px solid var(--border);
+}
+
+.template-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.template-header h4 {
+  color: var(--primary);
+  margin: 0;
+}
+
+.custom-badge {
+  padding: 2px 8px;
+  background: #FFF3E0;
+  color: #E65100;
+  border-radius: 10px;
+  font-size: 0.75rem;
+}
+
+.template-preview {
+  color: #666;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  margin-bottom: 12px;
+  white-space: pre-wrap;
+}
+
+.template-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* 模板编辑器 */
+.template-editor {
+  background: var(--cardBg);
+  border-radius: 12px;
+  padding: 25px;
+}
+
+.template-editor h3 {
+  color: var(--primary);
+  margin-bottom: 20px;
+}
+
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-group label {
+  display: block;
+  color: var(--text);
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.form-input {
+  width: 100%;
+  padding: 12px 15px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 1rem;
+  background: var(--paper);
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: var(--secondary);
+}
+
+.form-textarea {
+  width: 100%;
+  padding: 15px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-family: 'Noto Serif SC', serif;
+  line-height: 1.6;
+  resize: vertical;
+  min-height: 200px;
+  background: var(--paper);
+}
+
+.form-textarea:focus {
+  outline: none;
+  border-color: var(--secondary);
+}
+
+.form-hint {
+  margin-top: 8px;
+  font-size: 0.85rem;
+  color: #888;
+}
+
+.form-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+/* 响应式 */
+@media (max-width: 600px) {
+  .settings-tabs {
+    flex-direction: column;
+  }
+
+  .settings-tab {
+    width: 100%;
+    text-align: center;
+  }
+
+  .model-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .template-editor {
+    padding: 15px;
+  }
+
+  .form-actions {
+    flex-direction: column;
+  }
+
+  .form-actions .btn {
+    width: 100%;
+  }
+}
