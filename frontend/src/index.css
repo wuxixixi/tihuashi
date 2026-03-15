@@ -2012,3 +2012,202 @@ button:focus-visible {
   outline: 2px solid var(--primary);
   outline-offset: 2px;
 }
+
+/* ==================== About Section ==================== */
+.about-section {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.about-hero {
+  text-align: center;
+  padding: 40px 20px;
+  background: linear-gradient(135deg, var(--paper), #FFF8E1);
+  border-radius: 16px;
+  margin-bottom: 30px;
+  border: 1px solid var(--border);
+}
+
+.about-logo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 15px;
+}
+
+.logo-icon {
+  width: 80px;
+  height: 80px;
+  background: linear-gradient(135deg, var(--primary), var(--secondary));
+  color: white;
+  font-family: 'Ma Shan Zheng', cursive;
+  font-size: 2.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 20px;
+  box-shadow: 0 8px 24px rgba(139, 69, 19, 0.25);
+}
+
+.about-logo h2 {
+  color: var(--primary);
+  font-size: 1.5rem;
+  margin: 0;
+  font-weight: 600;
+}
+
+.about-tagline {
+  font-size: 1.2rem;
+  color: var(--secondary);
+  margin-top: 15px;
+  letter-spacing: 3px;
+}
+
+.about-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 20px;
+  margin-bottom: 30px;
+}
+
+.about-card {
+  background: var(--cardBg);
+  border-radius: 12px;
+  padding: 25px;
+  text-align: center;
+  border: 1px solid var(--border);
+  transition: all 0.3s;
+}
+
+.about-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 24px rgba(139, 69, 19, 0.15);
+  border-color: var(--secondary);
+}
+
+.card-icon {
+  font-size: 2.5rem;
+  margin-bottom: 15px;
+}
+
+.about-card h3 {
+  color: var(--primary);
+  margin-bottom: 12px;
+  font-size: 1.1rem;
+}
+
+.about-card p {
+  color: #666;
+  font-size: 0.9rem;
+  line-height: 1.7;
+}
+
+.about-features {
+  background: linear-gradient(135deg, #FFF8E1, var(--paper));
+  border-radius: 12px;
+  padding: 30px;
+  margin-bottom: 30px;
+  border: 1px solid var(--border);
+}
+
+.about-features h3 {
+  text-align: center;
+  color: var(--primary);
+  margin-bottom: 25px;
+  font-size: 1.2rem;
+}
+
+.features-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 20px;
+}
+
+.feature-item {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 15px;
+  background: var(--cardBg);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+
+.feature-num {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--secondary);
+  opacity: 0.6;
+}
+
+.feature-text {
+  font-size: 0.95rem;
+  color: var(--text);
+}
+
+.about-contact {
+  text-align: center;
+  padding: 30px;
+  background: var(--cardBg);
+  border-radius: 12px;
+  margin-bottom: 20px;
+  border: 1px solid var(--border);
+}
+
+.about-contact h3 {
+  color: var(--primary);
+  margin-bottom: 10px;
+}
+
+.about-contact p {
+  color: var(--secondary);
+  margin-bottom: 20px;
+}
+
+.contact-info {
+  display: flex;
+  justify-content: center;
+  gap: 30px;
+  flex-wrap: wrap;
+  color: #666;
+  font-size: 0.9rem;
+}
+
+.about-footer {
+  text-align: center;
+  padding: 20px;
+  color: #888;
+  font-size: 0.85rem;
+  border-top: 1px solid var(--border);
+}
+
+@media (max-width: 600px) {
+  .about-hero {
+    padding: 30px 15px;
+  }
+
+  .logo-icon {
+    width: 60px;
+    height: 60px;
+    font-size: 2rem;
+  }
+
+  .about-logo h2 {
+    font-size: 1.2rem;
+  }
+
+  .about-tagline {
+    font-size: 1rem;
+    letter-spacing: 1px;
+  }
+
+  .contact-info {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .features-grid {
+    grid-template-columns: 1fr;
+  }
+}

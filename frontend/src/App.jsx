@@ -131,10 +131,81 @@ function App() {
         >
           历史记录
         </button>
+        <button
+          className={`tab ${activeTab === 'about' ? 'active' : ''}`}
+          onClick={() => setActiveTab('about')}
+        >
+          关于我们
+        </button>
         <div className="tab-hint">
           Ctrl+Enter 快速生成 | Esc 关闭弹窗
         </div>
       </div>
+
+      {activeTab === 'about' && (
+        <div className="about-section fade-in">
+          <div className="about-hero">
+            <div className="about-logo">
+              <span className="logo-icon">墨</span>
+              <h2>上海觉测信息科技有限公司</h2>
+            </div>
+            <p className="about-tagline">以 AI 之力，传承文化之美</p>
+          </div>
+
+          <div className="about-cards">
+            <div className="about-card">
+              <div className="card-icon">🤖</div>
+              <h3>人工智能</h3>
+              <p>深耕 AI 视觉理解与自然语言生成，让机器读懂艺术，让技术服务人文。</p>
+            </div>
+            <div className="about-card">
+              <div className="card-icon">📊</div>
+              <h3>智能营销</h3>
+              <p>基于用户行为分析的个性化推荐引擎，精准触达目标受众，提升转化效率。</p>
+            </div>
+            <div className="about-card">
+              <div className="card-icon">🎯</div>
+              <h3>定制方案</h3>
+              <p>为企业量身打造 AI 解决方案，从需求分析到落地实施，全程专业服务。</p>
+            </div>
+          </div>
+
+          <div className="about-features">
+            <h3>我们的优势</h3>
+            <div className="features-grid">
+              <div className="feature-item">
+                <span className="feature-num">01</span>
+                <span className="feature-text">多模态 AI 技术积累</span>
+              </div>
+              <div className="feature-item">
+                <span className="feature-num">02</span>
+                <span className="feature-text">垂直领域深度优化</span>
+              </div>
+              <div className="feature-item">
+                <span className="feature-num">03</span>
+                <span className="feature-text">私有化部署支持</span>
+              </div>
+              <div className="feature-item">
+                <span className="feature-num">04</span>
+                <span className="feature-text">7×24 技术保障</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="about-contact">
+            <h3>联系我们</h3>
+            <p>商务合作 · 技术咨询 · 定制开发</p>
+            <div className="contact-info">
+              <span>📧 contact@juece.ai</span>
+              <span>🌐 上海 · 浦东新区</span>
+            </div>
+          </div>
+
+          <div className="about-footer">
+            <p>© 2026 上海觉测信息科技有限公司 · 用科技赋能文化传承</p>
+          </div>
+        </div>
+      )}
 
       {activeTab === 'create' && (
         <>
