@@ -16,10 +16,72 @@ app.use(cors());
 app.use(express.json());
 app.use('/uploads', express.static('uploads'));
 
+// ==================== 性能优化 ====================
+
+// 内存缓存（用于 AI 分析结果）
+const analysisCache = new Map();
+const CACHE_TTL = 1000 * 60 * 30; // 30 分钟缓存
+
+// 获取缓存
+function getCache(key) {
+  const item = analysisCache.get(key);
+  if (!item) return null;
+  if (Date.now() - item.timestamp > CACHE_TTL) {
+    analysisCache.delete(key);
+    return null;
+  }
+  return item.data;
+}
+
+// 设置缓存
+function setCache(key, data) {
+  analysisCache.set(key, { data, timestamp: Date.now() });
+}
+
+// 生成缓存 key（基于图片文件内容）
+function generateCacheKey(imagePath) {
+  const stats = fs.statSync(imagePath);
+  return `${imagePath}-${stats.size}-${stats.mtime.getTime()}`;
+}
+
+// 定期清理过期缓存
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, item] of analysisCache) {
+    if (now - item.timestamp > CACHE_TTL) {
+      analysisCache.delete(key);
+    }
+  }
+}, 1000 * 60 * 10); // 每 10 分钟清理一次
+
 // 确保上传目录存在
 const uploadDir = path.join(__dirname, 'uploads');
+const compressedDir = path.join(__dirname, 'uploads', 'compressed');
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
+}
+if (!fs.existsSync(compressedDir)) {
+  fs.mkdirSync(compressedDir, { recursive: true });
+}
+
+// 图片压缩函数（使用 Canvas 或简单缩放）
+async function compressImage(inputPath, outputPath, maxWidth = 1200, quality = 0.8) {
+  return new Promise((resolve, reject) => {
+    try {
+      // 使用 sharp 进行压缩（如果可用）
+      const sharp = require('sharp');
+      sharp(inputPath)
+        .resize(maxWidth, null, { fit: 'inside', withoutEnlargement: true })
+        .jpeg({ quality: Math.round(quality * 100), mozjpeg: true })
+        .toFile(outputPath)
+        .then(() => resolve(outputPath))
+        .catch(reject);
+    } catch (e) {
+      // sharp 不可用，直接复制文件
+      fs.copyFileSync(inputPath, outputPath);
+      resolve(outputPath);
+    }
+  });
 }
 
 // 文件上传配置
@@ -251,25 +313,73 @@ function parseTitleAndPoem(raw) {
 
 // ==================== API 路由 ====================
 
-// 1. 上传图片
-app.post('/api/upload', upload.single('image'), (req, res) => {
+// 1. 上传图片（支持压缩）
+app.post('/api/upload', upload.single('image'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: '请上传图片' });
-  const url = `/uploads/${req.file.filename}`;
-  res.json({
-    success: true,
-    url,
-    filename: req.file.filename,
-    fullPath: path.join(uploadDir, req.file.filename)
-  });
+
+  const originalPath = req.file.path;
+  const filename = req.file.filename;
+  const compressedFilename = `compressed_${filename.replace(/\.[^.]+$/, '.jpg')}`;
+  const compressedPath = path.join(compressedDir, compressedFilename);
+
+  try {
+    // 尝试压缩图片
+    await compressImage(originalPath, compressedPath, 1200, 0.8);
+
+    // 检查压缩后是否更小
+    const originalSize = fs.statSync(originalPath).size;
+    const compressedSize = fs.statSync(compressedPath).size;
+
+    let finalUrl, finalPath;
+    if (compressedSize < originalSize * 0.9) {
+      // 压缩后小于原文件 90%，使用压缩版本
+      finalUrl = `/uploads/compressed/${compressedFilename}`;
+      finalPath = compressedPath;
+      // 删除原文件以节省空间
+      fs.unlinkSync(originalPath);
+    } else {
+      // 压缩效果不明显，使用原文件
+      finalUrl = `/uploads/${filename}`;
+      finalPath = originalPath;
+      fs.unlinkSync(compressedPath);
+    }
+
+    res.json({
+      success: true,
+      url: finalUrl,
+      filename: path.basename(finalUrl),
+      fullPath: finalPath,
+      originalSize,
+      compressedSize: compressedSize < originalSize * 0.9 ? compressedSize : originalSize
+    });
+  } catch (err) {
+    // 压缩失败，使用原文件
+    console.error('图片压缩失败:', err.message);
+    res.json({
+      success: true,
+      url: `/uploads/${filename}`,
+      filename,
+      fullPath: originalPath
+    });
+  }
 });
 
-// 2. 分析画作
+// 2. 分析画作（支持缓存）
 app.post('/api/analyze', async (req, res) => {
   try {
     const { imagePath } = req.body;
     if (!imagePath || !fs.existsSync(imagePath)) {
       return res.status(400).json({ success: false, error: '图片路径无效' });
     }
+
+    // 检查缓存
+    const cacheKey = generateCacheKey(imagePath);
+    const cached = getCache(cacheKey);
+    if (cached) {
+      console.log('使用缓存的分析结果');
+      return res.json({ success: true, ...cached, fromCache: true });
+    }
+
     const imageBuffer = fs.readFileSync(imagePath);
     const base64 = imageBuffer.toString('base64');
     const ext = path.extname(imagePath).toLowerCase();
@@ -298,7 +408,12 @@ app.post('/api/analyze', async (req, res) => {
       analysisText = analysisRaw.replace(/【流派】.+/, '').trim();
     }
 
-    res.json({ success: true, analysis: analysisText || '抱歉，分析失败', genre });
+    const result = { analysis: analysisText || '抱歉，分析失败', genre };
+
+    // 存入缓存
+    setCache(cacheKey, result);
+
+    res.json({ success: true, ...result });
   } catch (error) {
     console.error('分析API错误:', error);
     res.status(500).json({ success: false, error: error.message });

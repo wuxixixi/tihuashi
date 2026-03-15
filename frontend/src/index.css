@@ -2549,3 +2549,43 @@ button:focus-visible {
     padding: 16px;
   }
 }
+
+/* ==================== 懒加载图片样式 ==================== */
+
+.lazy-image-container {
+  background: linear-gradient(135deg, #f5f5f5 0%, #e8e8e8 100%);
+  border-radius: 8px;
+}
+
+.lazy-image-container img {
+  display: block;
+}
+
+/* 骨架屏动画 */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.lazy-skeleton {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+/* 缓存指示器 */
+.cache-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.75rem;
+  color: #4CAF50;
+  padding: 2px 8px;
+  background: #E8F5E9;
+  border-radius: 10px;
+  margin-left: 8px;
+}

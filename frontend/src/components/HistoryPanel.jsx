@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import MarkdownRenderer from './MarkdownRenderer'
+import LazyImage from './LazyImage'
 
 const API_BASE = ''
 
@@ -370,7 +371,7 @@ export default function HistoryPanel({ toast, confirm }) {
             {history.map((item, idx) => (
               <div key={item.id} className="history-card slide-up">
                 <div className="history-card-img-wrap">
-                  <img src={item.imageUrl} alt={item.title} />
+                  <LazyImage src={item.imageUrl} alt={item.title} style={{ width: '100%', height: '100%' }} />
                   <button
                     className={`fav-btn ${item.favorite ? 'fav-active' : ''}`}
                     onClick={(e) => { e.stopPropagation(); toggleFavorite(item.id) }}
@@ -448,7 +449,7 @@ export default function HistoryPanel({ toast, confirm }) {
             <h2>{selectedHistory.title || '无题'}</h2>
 
             <div className="history-detail-image">
-              <img src={selectedHistory.imageUrl} alt={selectedHistory.title} />
+              <LazyImage src={selectedHistory.imageUrl} alt={selectedHistory.title} style={{ width: '100%', maxHeight: '400px' }} />
             </div>
 
             {selectedHistory.analysis && (
