@@ -1260,9 +1260,83 @@ app.get('/api/gallery/favorites/:sessionId', (req, res) => {
   }
 })
 
+// 21. 上传名画图片
+app.post('/api/gallery/:id/upload', upload.single('image'), (req, res) => {
+  try {
+    const { id } = req.params
+    if (!req.file) {
+      return res.status(400).json({ success: false, error: '请选择图片文件' })
+    }
+
+    const painting = db.prepare('SELECT * FROM paintings WHERE id = ?').get(id)
+    if (!painting) {
+      return res.status(404).json({ success: false, error: '画作不存在' })
+    }
+
+    const imageUrl = `/uploads/${req.file.filename}`
+
+    db.prepare('UPDATE paintings SET imageUrl = ? WHERE id = ?').run(imageUrl, id)
+
+    res.json({
+      success: true,
+      imageUrl,
+      message: '图片上传成功'
+    })
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message })
+  }
+})
+
+// 22. 添加新画作
+app.post('/api/gallery', upload.single('image'), (req, res) => {
+  try {
+    const { name, artist, dynasty, school, category, description } = req.body
+
+    if (!name) {
+      return res.status(400).json({ success: false, error: '画作名称不能为空' })
+    }
+
+    const id = 'p' + Date.now().toString(36) + Math.random().toString(36).substr(2, 5)
+    let imageUrl = ''
+
+    if (req.file) {
+      imageUrl = `/uploads/${req.file.filename}`
+    }
+
+    db.prepare(`
+      INSERT INTO paintings (id, name, artist, dynasty, school, category, imageUrl, description, createdAt)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(id, name, artist || '', dynasty || '', school || '', category || '', imageUrl, description || '', new Date().toISOString())
+
+    const painting = db.prepare('SELECT * FROM paintings WHERE id = ?').get(id)
+
+    res.json({ success: true, painting, message: '画作添加成功' })
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message })
+  }
+})
+
+// 23. 删除画作
+app.delete('/api/gallery/:id', (req, res) => {
+  try {
+    const { id } = req.params
+    const painting = db.prepare('SELECT * FROM paintings WHERE id = ?').get(id)
+    if (!painting) {
+      return res.status(404).json({ success: false, error: '画作不存在' })
+    }
+
+    db.prepare('DELETE FROM paintings WHERE id = ?').run(id)
+    db.prepare('DELETE FROM gallery_favorites WHERE paintingId = ?').run(id)
+
+    res.json({ success: true, message: '画作已删除' })
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message })
+  }
+})
+
 // ==================== 模型和模板管理 API ====================
 
-// 21. 获取可用模型列表
+// 24. 获取可用模型列表
 app.get('/api/models', (req, res) => {
   res.json({
     success: true,

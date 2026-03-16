@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import LazyImage from './LazyImage'
 
 const API_BASE = ''
@@ -23,6 +23,10 @@ export default function GalleryPanel({ toast, onSelectPainting }) {
   const [selectedPainting, setSelectedPainting] = useState(null)
   const [loading, setLoading] = useState(false)
   const [viewMode, setViewMode] = useState('all') // 'all' | 'favorites'
+  const [showAddModal, setShowAddModal] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const fileInputRef = useRef(null)
+  const addFileInputRef = useRef(null)
 
   const sessionId = getSessionId()
 
@@ -95,10 +99,121 @@ export default function GalleryPanel({ toast, onSelectPainting }) {
     }
   }
 
+  // 上传画作图片
+  const handleUploadImage = async (paintingId, file) => {
+    if (!file) return
+
+    setUploading(true)
+    const formData = new FormData()
+    formData.append('image', file)
+
+    try {
+      const res = await fetch(`${API_BASE}/api/gallery/${paintingId}/upload`, {
+        method: 'POST',
+        body: formData
+      })
+      const data = await res.json()
+      if (data.success) {
+        // 更新本地状态
+        setPaintings(prev => prev.map(p =>
+          p.id === paintingId ? { ...p, imageUrl: data.imageUrl } : p
+        ))
+        if (selectedPainting?.id === paintingId) {
+          setSelectedPainting(prev => ({ ...prev, imageUrl: data.imageUrl }))
+        }
+        toast.success('图片上传成功')
+      } else {
+        toast.error(data.error || '上传失败')
+      }
+    } catch (err) {
+      toast.error('上传失败')
+    }
+    setUploading(false)
+  }
+
+  // 添加新画作
+  const [newPainting, setNewPainting] = useState({
+    name: '',
+    artist: '',
+    dynasty: '',
+    school: '',
+    category: '',
+    description: ''
+  })
+  const [newPaintingImage, setNewPaintingImage] = useState(null)
+
+  const handleAddPainting = async (e) => {
+    e.preventDefault()
+    if (!newPainting.name) {
+      toast.error('请输入画作名称')
+      return
+    }
+
+    setUploading(true)
+    const formData = new FormData()
+    formData.append('name', newPainting.name)
+    formData.append('artist', newPainting.artist)
+    formData.append('dynasty', newPainting.dynasty)
+    formData.append('school', newPainting.school)
+    formData.append('category', newPainting.category)
+    formData.append('description', newPainting.description)
+    if (newPaintingImage) {
+      formData.append('image', newPaintingImage)
+    }
+
+    try {
+      const res = await fetch(`${API_BASE}/api/gallery`, {
+        method: 'POST',
+        body: formData
+      })
+      const data = await res.json()
+      if (data.success) {
+        toast.success('画作添加成功')
+        setShowAddModal(false)
+        setNewPainting({ name: '', artist: '', dynasty: '', school: '', category: '', description: '' })
+        setNewPaintingImage(null)
+        loadPaintings()
+      } else {
+        toast.error(data.error || '添加失败')
+      }
+    } catch (err) {
+      toast.error('添加失败')
+    }
+    setUploading(false)
+  }
+
+  // 删除画作
+  const handleDeletePainting = async (paintingId) => {
+    if (!confirm('确定要删除这幅画作吗？')) return
+
+    try {
+      const res = await fetch(`${API_BASE}/api/gallery/${paintingId}`, {
+        method: 'DELETE'
+      })
+      const data = await res.json()
+      if (data.success) {
+        toast.success('画作已删除')
+        setSelectedPainting(null)
+        loadPaintings()
+      } else {
+        toast.error(data.error || '删除失败')
+      }
+    } catch (err) {
+      toast.error('删除失败')
+    }
+  }
+
   return (
     <div className="gallery-section fade-in">
-      <h2>名画赏析</h2>
-      <p className="gallery-intro">精选历代名家画作，一键生成题画诗</p>
+      <div className="gallery-header">
+        <div>
+          <h2>名画赏析</h2>
+          <p className="gallery-intro">精选历代名家画作，一键生成题画诗</p>
+        </div>
+        <button className="btn btn-primary add-painting-btn" onClick={() => setShowAddModal(true)}>
+          + 添加名画
+        </button>
+      </div>
 
       <div className="gallery-toolbar">
         <form className="gallery-search" onSubmit={handleSearch}>
@@ -219,6 +334,45 @@ export default function GalleryPanel({ toast, onSelectPainting }) {
 
             <div className="gallery-detail-image">
               <LazyImage src={selectedPainting.imageUrl} alt={selectedPainting.name} style={{ width: '100%', maxHeight: '500px' }} />
+              {!selectedPainting.imageUrl && (
+                <div className="upload-placeholder">
+                  <p>暂无图片</p>
+                  <button
+                    className="btn btn-secondary"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    上传图片
+                  </button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    style={{ display: 'none' }}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0]
+                      if (file) handleUploadImage(selectedPainting.id, file)
+                    }}
+                  />
+                </div>
+              )}
+              {selectedPainting.imageUrl && (
+                <button
+                  className="btn btn-secondary upload-replace-btn"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  更换图片
+                </button>
+              )}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                style={{ display: 'none' }}
+                onChange={(e) => {
+                  const file = e.target.files?.[0]
+                  if (file) handleUploadImage(selectedPainting.id, file)
+                }}
+              />
             </div>
 
             {selectedPainting.description && (
@@ -238,8 +392,137 @@ export default function GalleryPanel({ toast, onSelectPainting }) {
               >
                 {selectedPainting.isFavorite ? '\u2764 已收藏' : '\u2661 收藏'}
               </button>
+              <button
+                className="btn btn-danger"
+                onClick={() => handleDeletePainting(selectedPainting.id)}
+              >
+                删除
+              </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* 添加名画弹窗 */}
+      {showAddModal && (
+        <div className="gallery-detail-modal" onClick={() => setShowAddModal(false)}>
+          <div className="gallery-detail-content slide-up" onClick={e => e.stopPropagation()}>
+            <button className="modal-close-btn" onClick={() => setShowAddModal(false)}>&#x2715;</button>
+
+            <h2>添加名画</h2>
+
+            <form className="add-painting-form" onSubmit={handleAddPainting}>
+              <div className="form-group">
+                <label>画作名称 *</label>
+                <input
+                  type="text"
+                  value={newPainting.name}
+                  onChange={(e) => setNewPainting(prev => ({ ...prev, name: e.target.value }))}
+                  placeholder="如：富春山居图"
+                  required
+                />
+              </div>
+
+              <div className="form-row">
+                <div className="form-group">
+                  <label>作者</label>
+                  <input
+                    type="text"
+                    value={newPainting.artist}
+                    onChange={(e) => setNewPainting(prev => ({ ...prev, artist: e.target.value }))}
+                    placeholder="如：黄公望"
+                  />
+                </div>
+                <div className="form-group">
+                  <label>朝代</label>
+                  <input
+                    type="text"
+                    value={newPainting.dynasty}
+                    onChange={(e) => setNewPainting(prev => ({ ...prev, dynasty: e.target.value }))}
+                    placeholder="如：元代"
+                  />
+                </div>
+              </div>
+
+              <div className="form-row">
+                <div className="form-group">
+                  <label>画派</label>
+                  <input
+                    type="text"
+                    value={newPainting.school}
+                    onChange={(e) => setNewPainting(prev => ({ ...prev, school: e.target.value }))}
+                    placeholder="如：山水画"
+                  />
+                </div>
+                <div className="form-group">
+                  <label>分类</label>
+                  <select
+                    value={newPainting.category}
+                    onChange={(e) => setNewPainting(prev => ({ ...prev, category: e.target.value }))}
+                  >
+                    <option value="">选择分类</option>
+                    <option value="山水">山水</option>
+                    <option value="人物">人物</option>
+                    <option value="花鸟">花鸟</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label>画作简介</label>
+                <textarea
+                  value={newPainting.description}
+                  onChange={(e) => setNewPainting(prev => ({ ...prev, description: e.target.value }))}
+                  placeholder="画作描述..."
+                  rows={3}
+                />
+              </div>
+
+              <div className="form-group">
+                <label>画作图片</label>
+                <div className="upload-area">
+                  <input
+                    ref={addFileInputRef}
+                    type="file"
+                    accept="image/*"
+                    style={{ display: 'none' }}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0]
+                      if (file) setNewPaintingImage(file)
+                    }}
+                  />
+                  {newPaintingImage ? (
+                    <div className="preview-container">
+                      <img src={URL.createObjectURL(newPaintingImage)} alt="预览" />
+                      <button type="button" className="btn btn-secondary" onClick={() => setNewPaintingImage(null)}>
+                        移除
+                      </button>
+                    </div>
+                  ) : (
+                    <button type="button" className="btn btn-secondary" onClick={() => addFileInputRef.current?.click()}>
+                      选择图片
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div className="form-actions">
+                <button type="button" className="btn btn-secondary" onClick={() => setShowAddModal(false)}>
+                  取消
+                </button>
+                <button type="submit" className="btn btn-primary" disabled={uploading}>
+                  {uploading ? '添加中...' : '添加画作'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {uploading && (
+        <div className="loading-overlay">
+          <div className="loading-spinner"></div>
+          <p>处理中...</p>
         </div>
       )}
     </div>
