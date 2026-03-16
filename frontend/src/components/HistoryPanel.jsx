@@ -449,7 +449,7 @@ export default function HistoryPanel({ toast, confirm }) {
             <h2>{selectedHistory.title || '无题'}</h2>
 
             <div className="history-detail-image">
-              <LazyImage src={selectedHistory.imageUrl} alt={selectedHistory.title} style={{ width: '100%', maxHeight: '400px' }} />
+              <img src={selectedHistory.imageUrl} alt={selectedHistory.title} style={{ width: '100%', maxHeight: '400px', objectFit: 'contain' }} />
             </div>
 
             {selectedHistory.analysis && (
