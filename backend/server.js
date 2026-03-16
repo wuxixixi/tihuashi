@@ -1149,8 +1149,8 @@ app.get('/api/gallery', (req, res) => {
     }))
 
     // 获取所有朝代和分类（用于筛选）
-    const dynasties = db.prepare('SELECT DISTINCT dynasty FROM paintings WHERE dynasty != "" ORDER BY dynasty').all().map(r => r.dynasty)
-    const categories = db.prepare('SELECT DISTINCT category FROM paintings WHERE category != "" ORDER BY category').all().map(r => r.category)
+    const dynasties = db.prepare("SELECT DISTINCT dynasty FROM paintings WHERE dynasty != '' ORDER BY dynasty").all().map(r => r.dynasty)
+    const categories = db.prepare("SELECT DISTINCT category FROM paintings WHERE category != '' ORDER BY category").all().map(r => r.category)
 
     res.json({
       success: true,
