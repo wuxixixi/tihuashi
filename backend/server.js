@@ -538,16 +538,9 @@ app.post('/api/analyze', async (req, res) => {
     const mime = ext === '.png' ? 'image/png' : ext === '.webp' ? 'image/webp' : 'image/jpeg';
     const dataUrl = `data:${mime};base64,${base64}`;
 
-    const prompt = `你是一位中国画鉴赏专家。请结合本图，从专业角度对这幅中国画进行赏析评论，需涵盖：
-1. 题材与内容：画作描绘了什么主题与物象？
-2. 构图与布局：画面构图、疏密、留白有何特点？
-3. 技法与风格：用笔、用墨、设色等技法与风格特征？
-4. 意境与情感：画作传达的意境与情感？
-5. 艺术价值：简要评价其艺术价值。
-
-要求：语言专业、优美流畅，字数严格控制在 200-300 字。
-
-最后请另起一行，以"【流派】"开头，写出该画所属的流派/画科（如：山水画、花鸟画、人物画、工笔画、写意画等），只写流派名称。`;
+    // 使用自定义模板
+    const templates = loadTemplates();
+    const prompt = templates.analysis.template;
 
     const analysisRaw = await callQwenOmniImageToText(dataUrl, prompt);
 
@@ -583,19 +576,12 @@ app.post('/api/poem', async (req, res) => {
       stylePrompt = STYLE_PROMPTS[style] || '体裁与风格自由发挥，可为诗或词';
     }
 
-    const prompt = `你是一位擅长题画诗/词的诗人。请根据下面的「画作赏析」与「用户感悟」，为这幅中国画创作一首题画作品。
-
-【画作赏析】
-${analysis}
-
-【用户感悟】
-${userFeeling}
-
-要求：
-1. 体裁与形式：${stylePrompt}
-2. 必须给出一个切题的标题（单独一行，如「题某某图」），标题要与画意、赏析、感悟契合
-3. 正文内容必须紧扣上述赏析与感悟，意境一致，不可泛泛而谈
-4. 仅输出：第一行为标题，空一行后为正文（可含简短创作说明），不要其他前缀或解释`;
+    // 使用自定义模板并替换变量
+    const templates = loadTemplates();
+    let prompt = templates.poem.template;
+    prompt = prompt.replace(/{analysis}/g, analysis || '');
+    prompt = prompt.replace(/{userFeeling}/g, userFeeling || '');
+    prompt = prompt.replace(/{style}/g, stylePrompt);
 
     const messages = [{ role: 'user', content: prompt }];
     const result = await callSparkAI(messages);
