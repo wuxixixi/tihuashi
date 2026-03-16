@@ -33,3 +33,4 @@ coverage/
 
 # Vitest cache
 frontend/node_modules/.vite/
+.claude/settings.local.json

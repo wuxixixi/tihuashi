@@ -22,7 +22,8 @@
       "Bash(ping:*)",
       "Bash(git config:*)",
       "Bash(git rm:*)",
-      "Bash(mkdir:*)"
+      "Bash(mkdir:*)",
+      "Bash(git remote:*)"
     ]
   }
 }
