@@ -23,7 +23,14 @@
       "Bash(git config:*)",
       "Bash(git rm:*)",
       "Bash(mkdir:*)",
-      "Bash(git remote:*)"
+      "Bash(git remote:*)",
+      "Bash(sshpass:*)",
+      "Bash(powershell.exe -Command \"echo y | plink -ssh root@101.34.62.149 -pw 412bao410 'echo connected'\" 2>/dev/null || echo \"plink not available\")",
+      "Bash(python:*)",
+      "Bash(pip install:*)",
+      "Bash(timeout:*)",
+      "Bash(ssh:*)",
+      "Bash(chmod:*)"
     ]
   }
 }

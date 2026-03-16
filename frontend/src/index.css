@@ -3195,3 +3195,133 @@ button:focus-visible {
     width: 100%;
   }
 }
+
+/* 名画上传功能样式 */
+.gallery-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 20px;
+}
+
+.add-painting-btn {
+  white-space: nowrap;
+}
+
+.upload-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 15px;
+  padding: 40px;
+  background: var(--paper);
+  border-radius: 8px;
+  color: #888;
+}
+
+.upload-replace-btn {
+  margin-top: 10px;
+}
+
+.add-painting-form {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.add-painting-form .form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 15px;
+}
+
+.add-painting-form .form-group input,
+.add-painting-form .form-group select,
+.add-painting-form .form-group textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 1rem;
+  background: var(--paper);
+  color: var(--text);
+}
+
+.add-painting-form .form-group input:focus,
+.add-painting-form .form-group select:focus,
+.add-painting-form .form-group textarea:focus {
+  outline: none;
+  border-color: var(--secondary);
+}
+
+.add-painting-form .upload-area {
+  padding: 20px;
+  border: 2px dashed var(--border);
+  border-radius: 8px;
+  text-align: center;
+}
+
+.add-painting-form .preview-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.add-painting-form .preview-container img {
+  max-width: 200px;
+  max-height: 200px;
+  border-radius: 8px;
+  object-fit: cover;
+}
+
+.loading-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 15px;
+  z-index: 1000;
+}
+
+.loading-overlay .loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid rgba(255, 255, 255, 0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+.loading-overlay p {
+  color: white;
+  font-size: 1rem;
+}
+
+.btn-danger {
+  background: #dc3545;
+  color: white;
+  border: none;
+}
+
+.btn-danger:hover {
+  background: #c82333;
+}
+
+@media (max-width: 600px) {
+  .gallery-header {
+    flex-direction: column;
+    gap: 15px;
+  }
+
+  .add-painting-form .form-row {
+    grid-template-columns: 1fr;
+  }
+}
