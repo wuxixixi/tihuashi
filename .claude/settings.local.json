@@ -20,7 +20,8 @@
       "Bash(gh:*)",
       "Bash(cd:*)",
       "Bash(ping:*)",
-      "Bash(git config:*)"
+      "Bash(git config:*)",
+      "Bash(git rm:*)"
     ]
   }
 }
