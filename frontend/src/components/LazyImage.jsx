@@ -58,6 +58,8 @@ export default function LazyImage({
         position: 'relative',
         overflow: 'hidden',
         backgroundColor: '#f5f5f5',
+        width: style?.width || '100%',
+        height: style?.height || '100%',
         ...style
       }}
     >
@@ -69,7 +71,7 @@ export default function LazyImage({
           style={{
             width: '100%',
             height: '100%',
-            objectFit: 'cover',
+            objectFit: style?.objectFit || 'cover',
             filter: 'blur(10px)',
             transition: 'opacity 0.3s'
           }}
@@ -86,7 +88,7 @@ export default function LazyImage({
           style={{
             width: '100%',
             height: '100%',
-            objectFit: 'cover',
+            objectFit: style?.objectFit || 'cover',
             opacity: isLoaded ? 1 : 0,
             transition: 'opacity 0.3s ease-in-out',
             position: 'absolute',

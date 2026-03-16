@@ -1267,9 +1267,11 @@ body {
 .history-card-img-wrap {
   position: relative;
   overflow: hidden;
+  height: 180px;
 }
 
-.history-card-img-wrap img {
+.history-card-img-wrap img,
+.history-card-img-wrap .lazy-image-container {
   width: 100%;
   height: 180px;
   object-fit: cover;
