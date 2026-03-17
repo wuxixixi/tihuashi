@@ -1570,6 +1570,109 @@ app.get('/api/models/test-all', async (req, res) => {
   res.json({ success: true, results })
 })
 
+// ==================== 统计 API ====================
+
+// 29. 获取创作统计数据
+app.get('/api/stats', (req, res) => {
+  try {
+    // 总创作数量
+    const { total } = db.prepare('SELECT COUNT(*) as total FROM history').get()
+
+    // 本月创作数量
+    const now = new Date()
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
+    const { monthCount } = db.prepare('SELECT COUNT(*) as monthCount FROM history WHERE createdAt >= ?').get(monthStart)
+
+    // 今日创作数量
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString()
+    const { todayCount } = db.prepare('SELECT COUNT(*) as todayCount FROM history WHERE createdAt >= ?').get(todayStart)
+
+    // 收藏数量
+    const { favoriteCount } = db.prepare('SELECT COUNT(*) as favoriteCount FROM history WHERE favorite = 1').get()
+
+    // 风格统计
+    const styleStats = db.prepare(`
+      SELECT style, COUNT(*) as count
+      FROM history
+      WHERE style IS NOT NULL AND style != ''
+      GROUP BY style
+      ORDER BY count DESC
+      LIMIT 10
+    `).all()
+
+    // 流派/画科统计
+    const genreStats = db.prepare(`
+      SELECT genre, COUNT(*) as count
+      FROM history
+      WHERE genre IS NOT NULL AND genre != ''
+      GROUP BY genre
+      ORDER BY count DESC
+      LIMIT 10
+    `).all()
+
+    // 创作时间分布（按小时）
+    const hourlyDistribution = db.prepare(`
+      SELECT CAST(strftime('%H', createdAt) AS INTEGER) as hour, COUNT(*) as count
+      FROM history
+      GROUP BY hour
+      ORDER BY hour
+    `).all()
+
+    // 创作时间分布（按星期）
+    const weekdayDistribution = db.prepare(`
+      SELECT CAST(strftime('%w', createdAt) AS INTEGER) as weekday, COUNT(*) as count
+      FROM history
+      GROUP BY weekday
+      ORDER BY weekday
+    `).all()
+
+    // 最近7天创作趋势
+    const weeklyTrend = db.prepare(`
+      SELECT date(createdAt) as date, COUNT(*) as count
+      FROM history
+      WHERE createdAt >= date('now', '-7 days')
+      GROUP BY date
+      ORDER BY date
+    `).all()
+
+    // 常用词汇（从诗词中提取，简单统计）
+    const recentPoems = db.prepare('SELECT poem FROM history ORDER BY createdAt DESC LIMIT 100').all()
+    const wordFreq = {}
+    recentPoems.forEach(row => {
+      if (row.poem) {
+        // 提取常见诗词词汇（2字词）
+        const words = row.poem.match(/[\u4e00-\u9fa5]{2}/g) || []
+        words.forEach(word => {
+          wordFreq[word] = (wordFreq[word] || 0) + 1
+        })
+      }
+    })
+    const topWords = Object.entries(wordFreq)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 20)
+      .map(([word, count]) => ({ word, count }))
+
+    res.json({
+      success: true,
+      stats: {
+        total,
+        monthCount,
+        todayCount,
+        favoriteCount,
+        styleStats,
+        genreStats,
+        hourlyDistribution,
+        weekdayDistribution,
+        weeklyTrend,
+        topWords
+      }
+    })
+  } catch (error) {
+    console.error('获取统计失败:', error)
+    res.status(500).json({ success: false, error: error.message })
+  }
+})
+
 // 初始化时加载用户设置
 function loadUserSettings() {
   try {

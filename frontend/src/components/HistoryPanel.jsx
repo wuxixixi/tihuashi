@@ -31,6 +31,13 @@ export default function HistoryPanel({ toast, confirm }) {
   const [selectedRewriteStyle, setSelectedRewriteStyle] = useState('')
   const [poemAnalysis, setPoemAnalysis] = useState('')
 
+  // 语音朗读状态
+  const [speaking, setSpeaking] = useState(false)
+
+  // 统计数据状态
+  const [stats, setStats] = useState(null)
+  const [showStats, setShowStats] = useState(false)
+
   // 解析 tags 字段
   const parseTags = (tagsStr) => {
     if (!tagsStr) return []
@@ -59,6 +66,25 @@ export default function HistoryPanel({ toast, confirm }) {
   }, [page, search, favoriteOnly, selectedGenre, toast])
 
   useEffect(() => { loadHistory() }, [loadHistory])
+
+  // 加载统计数据
+  const loadStats = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/stats`)
+      const data = await res.json()
+      if (data.success) {
+        setStats(data.stats)
+      }
+    } catch (err) {
+      console.error('加载统计失败', err)
+    }
+  }
+
+  useEffect(() => {
+    if (showStats) {
+      loadStats()
+    }
+  }, [showStats])
 
   const deleteHistory = async (id) => {
     const ok = await confirm('确定要删除这条记录吗？删除后不可恢复。', '删除确认')
@@ -170,6 +196,40 @@ export default function HistoryPanel({ toast, confirm }) {
     navigator.clipboard.writeText(text).then(() => {
       toast.success('已复制到剪贴板')
     }).catch(() => toast.error('复制失败'))
+  }
+
+  // 语音朗读诗词
+  const speakPoem = (item) => {
+    const synth = typeof window !== 'undefined' ? window.speechSynthesis : null
+    if (!synth) {
+      toast.warning('您的浏览器不支持语音合成')
+      return
+    }
+
+    if (speaking) {
+      synth.cancel()
+      setSpeaking(false)
+      return
+    }
+
+    const text = item.title ? `${item.title}。${item.poem}` : item.poem
+    const utterance = new SpeechSynthesisUtterance(text)
+    utterance.lang = 'zh-CN'
+    utterance.rate = 0.85
+    utterance.pitch = 0.9
+
+    // 尝试选择中文语音
+    const voices = synth.getVoices()
+    const zhVoice = voices.find(v => v.lang.includes('zh'))
+    if (zhVoice) {
+      utterance.voice = zhVoice
+    }
+
+    utterance.onstart = () => setSpeaking(true)
+    utterance.onend = () => setSpeaking(false)
+    utterance.onerror = () => setSpeaking(false)
+
+    synth.speak(utterance)
   }
 
   // AI 风格重写
@@ -301,7 +361,90 @@ export default function HistoryPanel({ toast, confirm }) {
 
   return (
     <div className="history-section fade-in">
-      <h2>历史记录</h2>
+      <div className="history-header">
+        <h2>历史记录</h2>
+        <button
+          className="stats-btn"
+          onClick={() => setShowStats(!showStats)}
+          title="查看统计数据"
+        >
+          {showStats ? '隐藏统计' : '📊 统计'}
+        </button>
+      </div>
+
+      {/* 统计面板 */}
+      {showStats && stats && (
+        <div className="stats-panel slide-up">
+          <div className="stats-grid">
+            <div className="stat-card">
+              <div className="stat-value">{stats.total}</div>
+              <div className="stat-label">总创作</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-value">{stats.monthCount}</div>
+              <div className="stat-label">本月创作</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-value">{stats.todayCount}</div>
+              <div className="stat-label">今日创作</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-value">{stats.favoriteCount}</div>
+              <div className="stat-label">已收藏</div>
+            </div>
+          </div>
+
+          {stats.styleStats && stats.styleStats.length > 0 && (
+            <div className="stats-section">
+              <h4>风格偏好</h4>
+              <div className="stats-bar-list">
+                {stats.styleStats.slice(0, 5).map((item, i) => (
+                  <div key={i} className="stats-bar-item">
+                    <span className="bar-label">{item.style || '未分类'}</span>
+                    <div className="bar-wrapper">
+                      <div
+                        className="bar-fill"
+                        style={{ width: `${Math.min(100, (item.count / stats.total) * 100)}%` }}
+                      />
+                    </div>
+                    <span className="bar-count">{item.count}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {stats.genreStats && stats.genreStats.length > 0 && (
+            <div className="stats-section">
+              <h4>画科分布</h4>
+              <div className="genre-tags">
+                {stats.genreStats.map((item, i) => (
+                  <span key={i} className="genre-tag">
+                    {item.genre} ({item.count})
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {stats.topWords && stats.topWords.length > 0 && (
+            <div className="stats-section">
+              <h4>常用词汇</h4>
+              <div className="word-cloud">
+                {stats.topWords.slice(0, 15).map((item, i) => (
+                  <span
+                    key={i}
+                    className="word-item"
+                    style={{ fontSize: `${Math.max(12, 24 - i)}px`, opacity: Math.max(0.5, 1 - i * 0.05) }}
+                  >
+                    {item.word}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="history-toolbar-row">
         <form className="history-toolbar" onSubmit={handleSearch}>
@@ -526,6 +669,13 @@ export default function HistoryPanel({ toast, confirm }) {
             <div className="detail-bottom-actions">
               <button className="icon-btn-labeled" onClick={() => copyPoem(selectedHistory)}>
                 &#x1F4CB; 复制诗词
+              </button>
+              <button
+                className={`icon-btn-labeled ${speaking ? 'speaking' : ''}`}
+                onClick={() => speakPoem(selectedHistory)}
+                style={{ color: speaking ? '#E91E63' : 'inherit' }}
+              >
+                {speaking ? '\u23F9 停止' : '\u1F3A4 朗读'}
               </button>
               <button className="icon-btn-labeled" onClick={() => setShowRewriteModal(true)}>
                 &#x1F4DD; 风格重写

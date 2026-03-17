@@ -10,6 +10,14 @@ const poemStyles = {
 // 重写风格选项
 const rewriteStyles = ['五言绝句', '七言绝句', '五言律诗', '七言律诗', '古体诗', '婉约词', '豪放词', '田园词', '边塞词']
 
+// 语音合成配置
+const getSpeechSynthesis = () => {
+  if (typeof window !== 'undefined' && window.speechSynthesis) {
+    return window.speechSynthesis
+  }
+  return null
+}
+
 // 书法风格配置
 const calligraphyStyles = {
   classic: { name: '古典雅致', bg: '#FEF9E7', border: '#8B4513', text: '#3E2723', accent: '#DEB887' },
@@ -40,6 +48,10 @@ export default function PoemPanel({ analysis, feeling, image, setLoadingStage, t
   const [selectedCalligraphyStyle, setSelectedCalligraphyStyle] = useState('classic')
   const [poemAnalysis, setPoemAnalysis] = useState('')
   const [polishSuggestion, setPolishSuggestion] = useState('')
+
+  // 语音朗读状态
+  const [speaking, setSpeaking] = useState(false)
+  const [speechRate, setSpeechRate] = useState(0.85)
 
   const generatePoem = async () => {
     if (!analysis) {
@@ -183,6 +195,40 @@ export default function PoemPanel({ analysis, feeling, image, setLoadingStage, t
     }).catch(() => {
       toast.error('复制失败')
     })
+  }
+
+  // 语音朗读诗词
+  const speakPoem = () => {
+    const synth = typeof window !== 'undefined' ? window.speechSynthesis : null
+    if (!synth) {
+      toast.warning('您的浏览器不支持语音合成')
+      return
+    }
+
+    if (speaking) {
+      synth.cancel()
+      setSpeaking(false)
+      return
+    }
+
+    const text = poemTitle ? `${poemTitle}。${poem}` : poem
+    const utterance = new SpeechSynthesisUtterance(text)
+    utterance.lang = 'zh-CN'
+    utterance.rate = speechRate
+    utterance.pitch = 0.9
+
+    // 尝试选择中文语音
+    const voices = synth.getVoices()
+    const zhVoice = voices.find(v => v.lang.includes('zh'))
+    if (zhVoice) {
+      utterance.voice = zhVoice
+    }
+
+    utterance.onstart = () => setSpeaking(true)
+    utterance.onend = () => setSpeaking(false)
+    utterance.onerror = () => setSpeaking(false)
+
+    synth.speak(utterance)
   }
 
   // 书法风格导出
@@ -448,6 +494,14 @@ export default function PoemPanel({ analysis, feeling, image, setLoadingStage, t
               </button>
               <button className="icon-btn" onClick={copyPoem} title="复制">
                 &#x1F4CB;
+              </button>
+              <button
+                className={`icon-btn ${speaking ? 'speaking' : ''}`}
+                onClick={speakPoem}
+                title={speaking ? '停止朗读' : '朗读诗词'}
+                style={{ color: speaking ? '#E91E63' : 'inherit' }}
+              >
+                {speaking ? '\u23F9' : '\u1F3A4'}
               </button>
               <button className="icon-btn" onClick={exportAsImage} title="书法导出">
                 &#x1F4E5;
