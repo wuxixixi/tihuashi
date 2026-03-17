@@ -1483,8 +1483,8 @@ app.post('/api/models/test', async (req, res) => {
     } else {
       // 测试视觉模型（用一个小测试图片）
       try {
-        // 使用一个简单的 1x1 像素测试图片
-        const testImageBase64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
+        // 使用 100x100 像素测试图片（符合 API 最小尺寸要求）
+        const testImageBase64 = 'iVBORw0KGgoAAAANSUhEUgAAAGQAAABkCAIAAAD/gAIDAAAAnklEQVR42u3QMQEAAAwCIPtnNIwV9u2BCKScRYEsWbJkyZKlQJYsWbJkyVIgS5YsWbJkKZAlS5YsWbIUyJIlS5YsWQpkyZIlS5YsBbJkyZIlS5YCWbJkyZIlS4EsWbJkyZKlQJYsWbJkyVIgS5YsWbJkKZAlS5YsWbIUyJIlS5YsWQpkyZIlS5YsBbJkyZIlS5YCWbJkyZIlS4EsWd8G9lK7Het9974AAAAASUVORK5CYII='
         const testDataUrl = `data:image/png;base64,${testImageBase64}`
 
         const result = await callQwenOmniImageToText(testDataUrl, '请回复"视觉模型测试成功"', model)
@@ -1544,7 +1544,7 @@ app.get('/api/models/test-all', async (req, res) => {
   }
 
   // 测试视觉模型
-  const testImageBase64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
+  const testImageBase64 = 'iVBORw0KGgoAAAANSUhEUgAAAGQAAABkCAIAAAD/gAIDAAAAnklEQVR42u3QMQEAAAwCIPtnNIwV9u2BCKScRYEsWbJkyZKlQJYsWbJkyVIgS5YsWbJkKZAlS5YsWbIUyJIlS5YsWQpkyZIlS5YsBbJkyZIlS5YCWbJkyZIlS4EsWbJkyZKlQJYsWbJkyVIgS5YsWbJkKZAlS5YsWbIUyJIlS5YsWQpkyZIlS5YsBbJkyZIlS5YCWbJkyZIlS4EsWd8G9lK7Het9974AAAAASUVORK5CYII='
   const testDataUrl = `data:image/png;base64,${testImageBase64}`
 
   for (const [id, info] of Object.entries(VISION_MODELS)) {
