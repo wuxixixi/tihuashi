@@ -123,20 +123,15 @@ const OMNI_CONFIG = {
 const TEXT_MODELS = {
   // OpenAI 系列
   'gpt-4o': { name: 'GPT-4o', provider: 'openai', description: '强大稳定，创作质量高', tested: true },
-  'gpt-4o-mini': { name: 'GPT-4o Mini', provider: 'openai', description: '快速高效，性价比高', tested: true },
   'gpt-5-mini': { name: 'GPT-5 Mini', provider: 'openai', description: '最新轻量版', tested: false },
   'gpt-5': { name: 'GPT-5', provider: 'openai', description: '最新旗舰模型', tested: false },
   // Anthropic 系列
   'claude-3-7-sonnet': { name: 'Claude 3.7 Sonnet', provider: 'anthropic', description: '最新版本，推理更强', tested: false },
-  'claude-3-5-sonnet': { name: 'Claude 3.5 Sonnet', provider: 'anthropic', description: '文学创作能力强', tested: true },
   // DeepSeek 系列
   'deepseek-chat': { name: 'DeepSeek V3', provider: 'deepseek', description: '中文理解出色', tested: true },
   'deepseek-reasoner': { name: 'DeepSeek R1', provider: 'deepseek', description: '深度思考模型', tested: false },
   // 阿里系列
   'qwen-max': { name: '通义千问 Max', provider: 'alibaba', description: '最强版本', tested: false },
-  'qwen-plus': { name: '通义千问 Plus', provider: 'alibaba', description: '古诗词专长', tested: true },
-  // 字节系列
-  'doubao-pro-256k': { name: '豆包 Pro 256K', provider: 'bytedance', description: '超长上下文', tested: false },
   // Google 系列
   'gemini-2.5-pro': { name: 'Gemini 2.5 Pro', provider: 'google', description: 'Google最强', tested: false }
 };
