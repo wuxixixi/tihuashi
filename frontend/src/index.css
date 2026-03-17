@@ -3055,6 +3055,106 @@ button:focus-visible {
   font-size: 0.9rem;
 }
 
+/* 模型测试功能样式 */
+.model-card.untested {
+  border-style: dashed;
+  opacity: 0.9;
+}
+
+.model-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.new-badge {
+  padding: 1px 6px;
+  background: #E3F2FD;
+  color: #1976D2;
+  border-radius: 8px;
+  font-size: 0.7rem;
+  font-weight: 500;
+}
+
+.model-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.model-status {
+  font-size: 0.75rem;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+.model-status.available {
+  background: #E8F5E9;
+  color: #2E7D32;
+}
+
+.model-status.unavailable {
+  background: #FFEBEE;
+  color: #C62828;
+}
+
+.btn-test {
+  padding: 3px 10px;
+  font-size: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 15px;
+  background: transparent;
+  color: #666;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-test:hover {
+  background: var(--secondary);
+  color: white;
+  border-color: var(--secondary);
+}
+
+.btn-test:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.test-all-section {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  margin-bottom: 20px;
+  padding: 15px;
+  background: #F5F5F5;
+  border-radius: 10px;
+}
+
+.btn-test-all {
+  background: linear-gradient(135deg, #1976D2, #42A5F5);
+  color: white;
+  border: none;
+}
+
+.btn-test-all:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(25, 118, 210, 0.3);
+}
+
+.btn-test-all:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.test-hint {
+  font-size: 0.85rem;
+  color: #888;
+}
+
 /* 模板列表 */
 .templates-list {
   display: grid;

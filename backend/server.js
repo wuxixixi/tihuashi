@@ -119,29 +119,55 @@ const OMNI_CONFIG = {
 
 // ==================== 多模型配置 ====================
 
-// 可用的文本模型列表
+// 可用的文本模型列表（2026年更新）
 const TEXT_MODELS = {
-  'gpt-4o-mini': { name: 'GPT-4o Mini', provider: 'openai', description: '快速高效，性价比高' },
-  'gpt-4o': { name: 'GPT-4o', provider: 'openai', description: '最强大，创作质量最高' },
-  'claude-3-5-sonnet': { name: 'Claude 3.5 Sonnet', provider: 'anthropic', description: '文学创作能力强' },
-  'deepseek-chat': { name: 'DeepSeek Chat', provider: 'deepseek', description: '中文理解出色' },
-  'qwen-plus': { name: '通义千问 Plus', provider: 'alibaba', description: '古诗词专长' },
-  'doubao-pro': { name: '豆包 Pro', provider: 'bytedance', description: '国产大模型' },
-  'gpt-5-mini': { name: 'GPT-5 Mini', provider: 'openai', description: '默认模型' }
+  // OpenAI 系列
+  'gpt-4o-mini': { name: 'GPT-4o Mini', provider: 'openai', description: '快速高效，性价比高', tested: true },
+  'gpt-4o': { name: 'GPT-4o', provider: 'openai', description: '强大稳定，创作质量高', tested: true },
+  'gpt-4.1': { name: 'GPT-4.1', provider: 'openai', description: '最新版本，能力更强', tested: false },
+  'gpt-4.1-mini': { name: 'GPT-4.1 Mini', provider: 'openai', description: '最新轻量版', tested: false },
+  // Anthropic 系列
+  'claude-3-5-sonnet': { name: 'Claude 3.5 Sonnet', provider: 'anthropic', description: '文学创作能力强', tested: true },
+  'claude-3-7-sonnet': { name: 'Claude 3.7 Sonnet', provider: 'anthropic', description: '最新版本，推理更强', tested: false },
+  // DeepSeek 系列
+  'deepseek-chat': { name: 'DeepSeek V3', provider: 'deepseek', description: '中文理解出色', tested: true },
+  'deepseek-reasoner': { name: 'DeepSeek Reasoner', provider: 'deepseek', description: '深度思考模型', tested: false },
+  // 阿里系列
+  'qwen-plus': { name: '通义千问 Plus', provider: 'alibaba', description: '古诗词专长', tested: true },
+  'qwen-max': { name: '通义千问 Max', provider: 'alibaba', description: '最强版本', tested: false },
+  // 字节系列
+  'doubao-pro-32k': { name: '豆包 Pro 32K', provider: 'bytedance', description: '长上下文', tested: true },
+  'doubao-pro-256k': { name: '豆包 Pro 256K', provider: 'bytedance', description: '超长上下文', tested: false },
+  // Google 系列
+  'gemini-2.0-flash': { name: 'Gemini 2.0 Flash', provider: 'google', description: '快速多模态', tested: false },
+  'gemini-2.5-pro': { name: 'Gemini 2.5 Pro', provider: 'google', description: 'Google最强', tested: false }
 };
 
-// 可用的视觉模型列表
+// 可用的视觉模型列表（2026年更新）
 const VISION_MODELS = {
-  'gpt-4o': { name: 'GPT-4o', provider: 'openai', description: '最强图像理解' },
-  'gpt-4o-mini': { name: 'GPT-4o Mini', provider: 'openai', description: '快速图像分析' },
-  'claude-3-5-sonnet': { name: 'Claude 3.5 Sonnet', provider: 'anthropic', description: '细腻的艺术感知' },
-  'qwen-vl-plus': { name: '通义千问 VL', provider: 'alibaba', description: '中国画专长' },
-  'Doubao-1.5-vision-pro-32k': { name: '豆包视觉 Pro', provider: 'bytedance', description: '默认视觉模型' }
+  // OpenAI 系列
+  'gpt-4o': { name: 'GPT-4o', provider: 'openai', description: '强大图像理解', tested: true },
+  'gpt-4o-mini': { name: 'GPT-4o Mini', provider: 'openai', description: '快速图像分析', tested: true },
+  'gpt-4.1': { name: 'GPT-4.1', provider: 'openai', description: '最新版本', tested: false },
+  // Anthropic 系列
+  'claude-3-5-sonnet': { name: 'Claude 3.5 Sonnet', provider: 'anthropic', description: '细腻艺术感知', tested: true },
+  'claude-3-7-sonnet': { name: 'Claude 3.7 Sonnet', provider: 'anthropic', description: '最新版本', tested: false },
+  // 阿里系列
+  'qwen-vl-plus': { name: '通义千问 VL Plus', provider: 'alibaba', description: '中国画专长', tested: true },
+  'qwen-vl-max': { name: '通义千问 VL Max', provider: 'alibaba', description: '最强视觉版', tested: false },
+  // 字节系列
+  'doubao-1.5-vision-pro-32k': { name: '豆包视觉 Pro 32K', provider: 'bytedance', description: '默认视觉模型', tested: true },
+  'doubao-1.5-vision-pro-256k': { name: '豆包视觉 Pro 256K', provider: 'bytedance', description: '长上下文视觉', tested: false },
+  // Google 系列
+  'gemini-2.0-flash': { name: 'Gemini 2.0 Flash', provider: 'google', description: '快速多模态', tested: true },
+  'gemini-2.5-pro': { name: 'Gemini 2.5 Pro', provider: 'google', description: 'Google最强视觉', tested: false },
+  // DeepSeek 视觉
+  'deepseek-vl': { name: 'DeepSeek VL', provider: 'deepseek', description: '国产视觉模型', tested: false }
 };
 
 // 当前选中的模型（可动态切换）
-let currentTextModel = process.env.DMX_MODEL || 'gpt-5-mini';
-let currentVisionModel = process.env.VISION_MODEL || 'Doubao-1.5-vision-pro-32k';
+let currentTextModel = process.env.DMX_MODEL || 'gpt-4o-mini';
+let currentVisionModel = process.env.VISION_MODEL || 'doubao-1.5-vision-pro-32k';
 
 // ==================== 提示词模板管理 ====================
 
@@ -1417,6 +1443,143 @@ app.post('/api/templates/:id/reset', (req, res) => {
   } catch (error) {
     res.status(500).json({ success: false, error: error.message })
   }
+})
+
+// ==================== 模型测试 API ====================
+
+// 27. 测试文本模型是否可用
+app.post('/api/models/test', async (req, res) => {
+  try {
+    const { model, type } = req.body
+    if (!model) {
+      return res.status(400).json({ success: false, error: '请指定模型' })
+    }
+
+    const isTextModel = type === 'text' || TEXT_MODELS[model]
+    const isVisionModel = type === 'vision' || VISION_MODELS[model]
+
+    if (!isTextModel && !isVisionModel) {
+      return res.status(400).json({ success: false, error: '未知模型' })
+    }
+
+    const startTime = Date.now()
+
+    if (isTextModel && type !== 'vision') {
+      // 测试文本模型
+      try {
+        const result = await callSparkAI(
+          [{ role: 'user', content: '你好，请回复"模型测试成功"' }],
+          model
+        )
+        const response = result.choices?.[0]?.message?.content || ''
+        const latency = Date.now() - startTime
+
+        res.json({
+          success: true,
+          model,
+          type: 'text',
+          latency,
+          response: response.substring(0, 100),
+          available: true
+        })
+      } catch (err) {
+        res.json({
+          success: false,
+          model,
+          type: 'text',
+          latency: Date.now() - startTime,
+          error: err.response?.data?.error?.message || err.message,
+          available: false
+        })
+      }
+    } else {
+      // 测试视觉模型（用一个小测试图片）
+      try {
+        // 使用一个简单的 1x1 像素测试图片
+        const testImageBase64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
+        const testDataUrl = `data:image/png;base64,${testImageBase64}`
+
+        const result = await callQwenOmniImageToText(testDataUrl, '请回复"视觉模型测试成功"', model)
+        const latency = Date.now() - startTime
+
+        res.json({
+          success: true,
+          model,
+          type: 'vision',
+          latency,
+          response: result.substring(0, 100),
+          available: true
+        })
+      } catch (err) {
+        res.json({
+          success: false,
+          model,
+          type: 'vision',
+          latency: Date.now() - startTime,
+          error: err.response?.data?.error?.message || err.message,
+          available: false
+        })
+      }
+    }
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message })
+  }
+})
+
+// 28. 批量测试所有模型
+app.get('/api/models/test-all', async (req, res) => {
+  const results = {
+    textModels: {},
+    visionModels: {},
+    testedAt: new Date().toISOString()
+  }
+
+  // 测试文本模型
+  for (const [id, info] of Object.entries(TEXT_MODELS)) {
+    try {
+      const start = Date.now()
+      await callSparkAI([{ role: 'user', content: '测试' }], id)
+      results.textModels[id] = {
+        ...info,
+        available: true,
+        latency: Date.now() - start,
+        error: null
+      }
+    } catch (err) {
+      results.textModels[id] = {
+        ...info,
+        available: false,
+        latency: null,
+        error: err.response?.data?.error?.message || err.message
+      }
+    }
+  }
+
+  // 测试视觉模型
+  const testImageBase64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
+  const testDataUrl = `data:image/png;base64,${testImageBase64}`
+
+  for (const [id, info] of Object.entries(VISION_MODELS)) {
+    try {
+      const start = Date.now()
+      await callQwenOmniImageToText(testDataUrl, '测试', id)
+      results.visionModels[id] = {
+        ...info,
+        available: true,
+        latency: Date.now() - start,
+        error: null
+      }
+    } catch (err) {
+      results.visionModels[id] = {
+        ...info,
+        available: false,
+        latency: null,
+        error: err.response?.data?.error?.message || err.message
+      }
+    }
+  }
+
+  res.json({ success: true, results })
 })
 
 // 初始化时加载用户设置

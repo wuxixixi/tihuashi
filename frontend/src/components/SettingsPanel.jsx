@@ -11,6 +11,11 @@ export default function SettingsPanel({ toast }) {
   const [loading, setLoading] = useState(true)
   const [activeSection, setActiveSection] = useState('models')
 
+  // 模型测试状态
+  const [testingModel, setTestingModel] = useState(null)
+  const [testingAll, setTestingAll] = useState(false)
+  const [testResults, setTestResults] = useState({ textModels: {}, visionModels: {} })
+
   // 编辑模板状态
   const [editingTemplate, setEditingTemplate] = useState(null)
   const [editName, setEditName] = useState('')
@@ -67,6 +72,57 @@ export default function SettingsPanel({ toast }) {
     } catch (err) {
       toast.error('切换失败')
     }
+  }
+
+  // 测试单个模型
+  const testModel = async (modelId, type) => {
+    setTestingModel(modelId)
+    try {
+      const res = await fetch(`${API_BASE}/api/models/test`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: modelId, type })
+      })
+      const data = await res.json()
+
+      setTestResults(prev => ({
+        ...prev,
+        [type === 'text' ? 'textModels' : 'visionModels']: {
+          ...prev[type === 'text' ? 'textModels' : 'visionModels'],
+          [modelId]: data
+        }
+      }))
+
+      if (data.success && data.available) {
+        toast.success(`${modelId} 测试成功 (${data.latency}ms)`)
+      } else {
+        toast.error(`${modelId} 测试失败: ${data.error}`)
+      }
+    } catch (err) {
+      toast.error('测试请求失败')
+    }
+    setTestingModel(null)
+  }
+
+  // 测试所有模型
+  const testAllModels = async () => {
+    setTestingAll(true)
+    toast.info('开始测试所有模型，请稍候...')
+    try {
+      const res = await fetch(`${API_BASE}/api/models/test-all`)
+      const data = await res.json()
+      if (data.success) {
+        setTestResults(data.results)
+
+        // 统计结果
+        const textAvailable = Object.values(data.results.textModels).filter(r => r.available).length
+        const visionAvailable = Object.values(data.results.visionModels).filter(r => r.available).length
+        toast.success(`测试完成：文本模型 ${textAvailable}/${Object.keys(textModels).length} 可用，视觉模型 ${visionAvailable}/${Object.keys(visionModels).length} 可用`)
+      }
+    } catch (err) {
+      toast.error('批量测试失败')
+    }
+    setTestingAll(false)
   }
 
   const startEditTemplate = (id) => {
@@ -130,6 +186,22 @@ export default function SettingsPanel({ toast }) {
     }
   }
 
+  // 获取模型状态显示
+  const getModelStatus = (id, type) => {
+    const results = type === 'text' ? testResults.textModels[id] : testResults.visionModels[id]
+    if (!results) return null
+
+    return results.available ? (
+      <span className="model-status available" title={`延迟: ${results.latency}ms`}>
+        ✓ {results.latency}ms
+      </span>
+    ) : (
+      <span className="model-status unavailable" title={results.error}>
+        ✗ 不可用
+      </span>
+    )
+  }
+
   if (loading) {
     return (
       <div className="settings-section fade-in">
@@ -163,20 +235,46 @@ export default function SettingsPanel({ toast }) {
 
       {activeSection === 'models' && (
         <div className="settings-content slide-up">
+          {/* 批量测试按钮 */}
+          <div className="test-all-section">
+            <button
+              className="btn btn-test-all"
+              onClick={testAllModels}
+              disabled={testingAll}
+            >
+              {testingAll ? '测试中...' : '🔍 测试所有模型可用性'}
+            </button>
+            <span className="test-hint">点击测试所有模型是否可用（约需30秒）</span>
+          </div>
+
           {/* 文本模型选择 */}
           <div className="settings-group">
-            <h3>&#x1F916; 文本生成模型</h3>
+            <h3>🤖 文本生成模型</h3>
             <p className="settings-desc">用于诗词创作、润色、解析等文本生成任务</p>
             <div className="model-grid">
               {Object.entries(textModels).map(([id, model]) => (
                 <div
                   key={id}
-                  className={`model-card ${currentTextModel === id ? 'active' : ''}`}
+                  className={`model-card ${currentTextModel === id ? 'active' : ''} ${model.tested === false ? 'untested' : ''}`}
                   onClick={() => switchModel('text', id)}
                 >
-                  <div className="model-name">{model.name}</div>
+                  <div className="model-header">
+                    <div className="model-name">{model.name}</div>
+                    {!model.tested && <span className="new-badge">新</span>}
+                  </div>
                   <div className="model-desc">{model.description}</div>
-                  {currentTextModel === id && <span className="model-check">&#x2713;</span>}
+                  <div className="model-footer">
+                    {getModelStatus(id, 'text')}
+                    <button
+                      className="btn-test"
+                      onClick={(e) => { e.stopPropagation(); testModel(id, 'text') }}
+                      disabled={testingModel === id}
+                      title="测试此模型"
+                    >
+                      {testingModel === id ? '...' : '测试'}
+                    </button>
+                  </div>
+                  {currentTextModel === id && <span className="model-check">✓</span>}
                 </div>
               ))}
             </div>
@@ -184,18 +282,32 @@ export default function SettingsPanel({ toast }) {
 
           {/* 视觉模型选择 */}
           <div className="settings-group">
-            <h3>&#x1F3A8; 图像理解模型</h3>
+            <h3>🎨 图像理解模型</h3>
             <p className="settings-desc">用于画作分析和图像理解</p>
             <div className="model-grid">
               {Object.entries(visionModels).map(([id, model]) => (
                 <div
                   key={id}
-                  className={`model-card ${currentVisionModel === id ? 'active' : ''}`}
+                  className={`model-card ${currentVisionModel === id ? 'active' : ''} ${model.tested === false ? 'untested' : ''}`}
                   onClick={() => switchModel('vision', id)}
                 >
-                  <div className="model-name">{model.name}</div>
+                  <div className="model-header">
+                    <div className="model-name">{model.name}</div>
+                    {!model.tested && <span className="new-badge">新</span>}
+                  </div>
                   <div className="model-desc">{model.description}</div>
-                  {currentVisionModel === id && <span className="model-check">&#x2713;</span>}
+                  <div className="model-footer">
+                    {getModelStatus(id, 'vision')}
+                    <button
+                      className="btn-test"
+                      onClick={(e) => { e.stopPropagation(); testModel(id, 'vision') }}
+                      disabled={testingModel === id}
+                      title="测试此模型"
+                    >
+                      {testingModel === id ? '...' : '测试'}
+                    </button>
+                  </div>
+                  {currentVisionModel === id && <span className="model-check">✓</span>}
                 </div>
               ))}
             </div>
