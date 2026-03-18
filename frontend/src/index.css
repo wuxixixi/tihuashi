@@ -3838,3 +3838,104 @@ button:focus-visible {
     min-width: 100%;
   }
 }
+
+/* 视频模型选择器样式 */
+.model-selector {
+  margin-bottom: 20px;
+  position: relative;
+}
+
+.model-selector-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  background: var(--gradientStart);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.model-selector-header:hover {
+  border-color: var(--primary);
+}
+
+.current-model {
+  flex: 1;
+  font-weight: 500;
+  color: var(--primary);
+}
+
+.dropdown-arrow {
+  font-size: 12px;
+  color: var(--text);
+  opacity: 0.6;
+}
+
+.model-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: var(--cardBg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  margin-top: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  z-index: 100;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.model-option {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.model-option:last-child {
+  border-bottom: none;
+}
+
+.model-option:hover {
+  background: var(--gradientStart);
+}
+
+.model-option.active {
+  background: linear-gradient(135deg, var(--primary), var(--secondary));
+  color: white;
+}
+
+.model-option .model-name {
+  font-weight: 600;
+  font-size: 15px;
+  margin-bottom: 4px;
+}
+
+.model-option .model-desc {
+  font-size: 13px;
+  opacity: 0.7;
+  margin-bottom: 4px;
+}
+
+.model-option .model-cost {
+  font-size: 12px;
+  opacity: 0.6;
+}
+
+.model-option.active .model-desc,
+.model-option.active .model-cost {
+  opacity: 0.9;
+}
+
+.used-model {
+  font-size: 13px;
+  color: var(--text);
+  opacity: 0.7;
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  background: var(--gradientStart);
+  border-radius: 8px;
+}

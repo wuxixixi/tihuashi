@@ -117,6 +117,59 @@ const OMNI_CONFIG = {
   model: process.env.VISION_MODEL || 'Doubao-1.5-vision-pro-32k'
 };
 
+// ==================== 视频生成模型配置 ====================
+
+// 可用的视频生成模型列表
+const VIDEO_MODELS = {
+  // 可灵系列
+  'kling-v1': {
+    name: '可灵标准版',
+    provider: 'kling',
+    description: '快手可灵AI，图生视频，5秒视频',
+    apiUrl: 'https://api.klingai.com/v1/videos/image2video',
+    duration: 5,
+    cost: 0.5
+  },
+  'kling-v1-pro': {
+    name: '可灵专业版',
+    provider: 'kling',
+    description: '快手可灵AI专业版，更高质量',
+    apiUrl: 'https://api.klingai.com/v1/videos/image2video',
+    duration: 5,
+    cost: 1.0
+  },
+  // 通义万象
+  'wanx-v1': {
+    name: '通义万象',
+    provider: 'aliyun',
+    description: '阿里云通义万象，中文理解好',
+    apiUrl: 'https://dashscope.aliyuncs.com/api/v1/services/aigc/video-generation/generate',
+    duration: 4,
+    cost: 0.8
+  },
+  // Runway
+  'runway-gen3': {
+    name: 'Runway Gen-3',
+    provider: 'runway',
+    description: 'Runway最新视频生成模型',
+    apiUrl: 'https://api.runwayml.com/v1/generate',
+    duration: 5,
+    cost: 1.5
+  },
+  // DMXAPI 视频模型（如果支持）
+  'dmx-video': {
+    name: 'DMX 视频生成',
+    provider: 'dmxapi',
+    description: '通过DMX API调用视频生成',
+    apiUrl: `${DMX_CONFIG.baseUrl}/video/generations`,
+    duration: 5,
+    cost: 0.3
+  }
+};
+
+// 当前选中的视频模型
+let currentVideoModel = process.env.VIDEO_MODEL || 'kling-v1';
+
 // ==================== 多模型配置 ====================
 
 // 可用的文本模型列表（2026年3月更新）
@@ -1751,11 +1804,14 @@ function generateAnimationPrompt(analysis, genre, style = 'natural') {
 // 30. 生成动画
 app.post('/api/animate/generate', async (req, res) => {
   try {
-    const { imageUrl, analysis, genre, historyId, style = 'natural' } = req.body
+    const { imageUrl, analysis, genre, historyId, style = 'natural', videoModel = currentVideoModel } = req.body
 
     if (!imageUrl) {
       return res.status(400).json({ success: false, error: '请提供画作图片' })
     }
+
+    // 获取视频模型配置
+    const videoConfig = VIDEO_MODELS[videoModel] || VIDEO_MODELS['kling-v1']
 
     // 生成动画提示词
     const prompt = generateAnimationPrompt(analysis, genre, style)
@@ -1763,47 +1819,104 @@ app.post('/api/animate/generate', async (req, res) => {
     // 创建动画记录
     const animationId = uuidv4()
     db.prepare(`
-      INSERT INTO animations (id, historyId, imageUrl, prompt, status, provider, createdAt)
-      VALUES (?, ?, ?, ?, 'pending', 'kling', ?)
-    `).run(animationId, historyId || null, imageUrl, prompt, new Date().toISOString())
+      INSERT INTO animations (id, historyId, imageUrl, prompt, status, provider, cost, createdAt)
+      VALUES (?, ?, ?, ?, 'pending', ?, ?, ?)
+    `).run(animationId, historyId || null, imageUrl, prompt, videoConfig.provider, videoConfig.cost, new Date().toISOString())
 
-    // 调用可灵API生成视频
+    // 获取图片的完整URL
+    let fullImageUrl = imageUrl
+    if (!imageUrl.startsWith('http')) {
+      const host = req.get('host')
+      const protocol = req.protocol
+      fullImageUrl = `${protocol}://${host}${imageUrl}`
+    }
+
+    console.log(`调用 ${videoConfig.name} 生成视频:`, fullImageUrl)
+
     try {
-      // 获取图片的完整URL
-      let fullImageUrl = imageUrl
-      if (!imageUrl.startsWith('http')) {
-        // 如果是相对路径，转换为完整URL
-        const host = req.get('host')
-        const protocol = req.protocol
-        fullImageUrl = `${protocol}://${host}${imageUrl}`
+      let taskId = null
+      let apiResponse = null
+
+      // 根据不同的提供商调用不同的 API
+      if (videoConfig.provider === 'dmxapi') {
+        // 使用 DMXAPI 视频生成
+        const dmxResponse = await axios.post(videoConfig.apiUrl, {
+          model: videoModel,
+          image_url: fullImageUrl,
+          prompt: prompt,
+          duration: videoConfig.duration
+        }, {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${DMX_CONFIG.apiKey}`
+          },
+          timeout: 30000
+        })
+        taskId = dmxResponse.data?.id || dmxResponse.data?.task_id
+        apiResponse = dmxResponse.data
+
+      } else if (videoConfig.provider === 'kling') {
+        // 可灵 API
+        const klingApiKey = process.env.KLING_API_KEY || DMX_CONFIG.apiKey
+        const klingResponse = await axios.post(videoConfig.apiUrl, {
+          model: videoModel,
+          image_url: fullImageUrl,
+          prompt: prompt,
+          duration: videoConfig.duration,
+          cfg_scale: 0.5,
+          mode: videoModel.includes('pro') ? 'pro' : 'std'
+        }, {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${klingApiKey}`
+          },
+          timeout: 30000
+        })
+        taskId = klingResponse.data?.data?.task_id || klingResponse.data?.task_id
+        apiResponse = klingResponse.data
+
+      } else if (videoConfig.provider === 'aliyun') {
+        // 阿里云通义万象
+        const aliResponse = await axios.post(videoConfig.apiUrl, {
+          model: videoModel,
+          input: {
+            image_url: fullImageUrl,
+            prompt: prompt
+          },
+          parameters: {
+            duration: videoConfig.duration
+          }
+        }, {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${process.env.ALIYUN_API_KEY || DMX_CONFIG.apiKey}`
+          },
+          timeout: 30000
+        })
+        taskId = aliResponse.data?.output?.task_id || aliResponse.data?.request_id
+        apiResponse = aliResponse.data
+
+      } else if (videoConfig.provider === 'runway') {
+        // Runway API
+        const runwayResponse = await axios.post(videoConfig.apiUrl, {
+          model: videoModel,
+          image: fullImageUrl,
+          prompt: prompt,
+          duration: videoConfig.duration
+        }, {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${process.env.RUNWAY_API_KEY || DMX_CONFIG.apiKey}`
+          },
+          timeout: 30000
+        })
+        taskId = runwayResponse.data?.id
+        apiResponse = runwayResponse.data
       }
 
-      // 可灵API调用
-      const klingApiKey = process.env.KLING_API_KEY || process.env.DMX_API_KEY
-      const klingApiUrl = process.env.KLING_API_URL || 'https://api.klingai.com/v1/videos/image2video'
-
-      console.log('调用可灵API生成视频:', fullImageUrl)
-
-      const klingResponse = await axios.post(klingApiUrl, {
-        model: 'kling-v1',
-        image_url: fullImageUrl,
-        prompt: prompt,
-        duration: 5,
-        cfg_scale: 0.5,
-        mode: 'std' // std 或 pro
-      }, {
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${klingApiKey}`
-        },
-        timeout: 30000
-      })
-
-      const taskId = klingResponse.data?.data?.task_id || klingResponse.data?.task_id
-
-      // 更新记录
+      // 更新记录为处理中
       db.prepare(`
-        UPDATE animations SET status = 'processing', provider = 'kling'
+        UPDATE animations SET status = 'processing'
         WHERE id = ?
       `).run(animationId)
 
@@ -1813,21 +1926,22 @@ app.post('/api/animate/generate', async (req, res) => {
         prompt,
         taskId,
         status: 'processing',
+        provider: videoConfig.provider,
+        modelName: videoConfig.name,
         message: '视频生成任务已提交，请稍后查询状态'
       })
 
     } catch (apiError) {
-      console.error('可灵API调用失败:', apiError.response?.data || apiError.message)
+      console.error('视频API调用失败:', apiError.response?.data || apiError.message)
 
       // 如果API调用失败，使用模拟模式
       if (process.env.NODE_ENV === 'development' || !process.env.KLING_API_KEY) {
         console.log('使用模拟模式生成视频')
 
-        // 更新为模拟完成状态
         db.prepare(`
           UPDATE animations SET status = 'completed', videoUrl = ?, errorMessage = '模拟模式'
           WHERE id = ?
-        `).run(imageUrl, animationId) // 模拟模式下返回原图作为"视频"
+        `).run(imageUrl, animationId)
 
         res.json({
           success: true,
@@ -1838,7 +1952,6 @@ app.post('/api/animate/generate', async (req, res) => {
           demo: true
         })
       } else {
-        // 更新失败状态
         db.prepare(`
           UPDATE animations SET status = 'failed', errorMessage = ?
           WHERE id = ?
@@ -1957,6 +2070,36 @@ app.delete('/api/animate/:id', (req, res) => {
   try {
     db.prepare('DELETE FROM animations WHERE id = ?').run(req.params.id)
     res.json({ success: true, message: '动画记录已删除' })
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message })
+  }
+})
+
+// 34. 获取视频模型列表
+app.get('/api/video-models', (req, res) => {
+  res.json({
+    success: true,
+    models: VIDEO_MODELS,
+    currentModel: currentVideoModel
+  })
+})
+
+// 35. 切换视频模型
+app.post('/api/video-models/switch', (req, res) => {
+  try {
+    const { model } = req.body
+    if (!VIDEO_MODELS[model]) {
+      return res.status(400).json({ success: false, error: '无效的视频模型' })
+    }
+    currentVideoModel = model
+    db.prepare('INSERT OR REPLACE INTO user_settings (key, value, updatedAt) VALUES (?, ?, ?)')
+      .run('videoModel', model, new Date().toISOString())
+    res.json({
+      success: true,
+      currentModel: model,
+      modelInfo: VIDEO_MODELS[model],
+      message: '视频模型已切换'
+    })
   } catch (error) {
     res.status(500).json({ success: false, error: error.message })
   }

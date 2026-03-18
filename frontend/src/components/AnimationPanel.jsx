@@ -17,6 +17,24 @@ export default function AnimationPanel({ image, analysis, genre, historyId, toas
   const [showPromptEdit, setShowPromptEdit] = useState(false)
   const [polling, setPolling] = useState(false)
 
+  // 视频模型状态
+  const [videoModels, setVideoModels] = useState({})
+  const [currentVideoModel, setCurrentVideoModel] = useState('kling-v1')
+  const [showModelSelector, setShowModelSelector] = useState(false)
+
+  // 加载视频模型列表
+  useEffect(() => {
+    fetch(`${API_BASE}/api/video-models`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          setVideoModels(data.models)
+          setCurrentVideoModel(data.currentModel)
+        }
+      })
+      .catch(err => console.error('加载视频模型失败:', err))
+  }, [])
+
   // 生成动画
   const generateAnimation = async () => {
     if (!image) {
@@ -34,7 +52,8 @@ export default function AnimationPanel({ image, analysis, genre, historyId, toas
           analysis,
           genre,
           historyId,
-          style
+          style,
+          videoModel: currentVideoModel
         })
       })
 
@@ -44,17 +63,17 @@ export default function AnimationPanel({ image, analysis, genre, historyId, toas
           id: data.animationId,
           status: data.status,
           prompt: data.prompt,
-          videoUrl: null
+          videoUrl: null,
+          modelName: data.modelName
         })
         setPrompt(data.prompt)
 
         if (data.status === 'processing') {
-          // 开始轮询状态
           startPolling(data.animationId)
         } else if (data.status === 'completed') {
           setAnimation(prev => ({
             ...prev,
-            videoUrl: image, // 模拟模式
+            videoUrl: image,
             status: 'completed'
           }))
           toast.success('动画生成完成！')
@@ -68,6 +87,25 @@ export default function AnimationPanel({ image, analysis, genre, historyId, toas
       toast.error('网络错误，请重试')
     }
     setLoading(false)
+  }
+
+  // 切换视频模型
+  const switchVideoModel = async (modelId) => {
+    try {
+      const res = await fetch(`${API_BASE}/api/video-models/switch`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: modelId })
+      })
+      const data = await res.json()
+      if (data.success) {
+        setCurrentVideoModel(modelId)
+        toast.success(`已切换到 ${data.modelInfo.name}`)
+      }
+    } catch (err) {
+      toast.error('切换模型失败')
+    }
+    setShowModelSelector(false)
   }
 
   // 轮询动画状态
@@ -91,7 +129,6 @@ export default function AnimationPanel({ image, analysis, genre, historyId, toas
             setPolling(false)
             toast.error('动画生成失败: ' + (data.animation.errorMessage || '未知错误'))
           } else {
-            // 继续轮询
             setTimeout(poll, 3000)
           }
         }
@@ -122,6 +159,32 @@ export default function AnimationPanel({ image, analysis, genre, historyId, toas
             AI 将根据画作的意境和风格，为画作生成动态效果，让静态的名画"活"起来。
           </p>
 
+          {/* 视频模型选择 */}
+          <div className="model-selector">
+            <div className="model-selector-header" onClick={() => setShowModelSelector(!showModelSelector)}>
+              <span>🎥 视频模型：</span>
+              <span className="current-model">
+                {videoModels[currentVideoModel]?.name || currentVideoModel}
+              </span>
+              <span className="dropdown-arrow">{showModelSelector ? '▲' : '▼'}</span>
+            </div>
+            {showModelSelector && (
+              <div className="model-dropdown">
+                {Object.entries(videoModels).map(([id, model]) => (
+                  <div
+                    key={id}
+                    className={`model-option ${currentVideoModel === id ? 'active' : ''}`}
+                    onClick={() => switchVideoModel(id)}
+                  >
+                    <div className="model-name">{model.name}</div>
+                    <div className="model-desc">{model.description}</div>
+                    <div className="model-cost">约 ¥{model.cost}/次</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
           <div className="style-selector">
             <label>选择动画风格：</label>
             <div className="style-options">
@@ -148,6 +211,13 @@ export default function AnimationPanel({ image, analysis, genre, historyId, toas
         </div>
       ) : (
         <div className="animation-result">
+          {/* 使用的模型显示 */}
+          {animation.modelName && (
+            <div className="used-model">
+              使用模型：{animation.modelName}
+            </div>
+          )}
+
           {/* 提示词显示/编辑 */}
           <div className="prompt-section">
             <div className="prompt-header">
