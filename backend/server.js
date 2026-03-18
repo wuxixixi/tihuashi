@@ -119,8 +119,8 @@ const OMNI_CONFIG = {
 
 // ==================== 视频生成模型配置 ====================
 
-// 可用的视频生成模型列表
-const VIDEO_MODELS = {
+// 默认视频生成模型列表
+const DEFAULT_VIDEO_MODELS = {
   // 可灵系列
   'kling-v1': {
     name: '可灵标准版',
@@ -155,20 +155,75 @@ const VIDEO_MODELS = {
     apiUrl: 'https://api.runwayml.com/v1/generate',
     duration: 5,
     cost: 1.5
-  },
-  // DMXAPI 视频模型（如果支持）
-  'dmx-video': {
-    name: 'DMX 视频生成',
-    provider: 'dmxapi',
-    description: '通过DMX API调用视频生成',
-    apiUrl: `${DMX_CONFIG.baseUrl}/video/generations`,
-    duration: 5,
-    cost: 0.3
   }
 };
 
+// 动态视频模型列表（从 DMXAPI 获取）
+let dynamicVideoModels = { ...DEFAULT_VIDEO_MODELS }
+
+// 从 DMXAPI 获取视频模型列表
+async function fetchDMXVideoModels() {
+  try {
+    // 尝试从 DMXAPI 获取视频模型列表
+    const response = await axios.get(`${DMX_CONFIG.baseUrl}/models`, {
+      headers: {
+        'Authorization': `Bearer ${DMX_CONFIG.apiKey}`
+      },
+      timeout: 5000
+    })
+
+    const models = response.data?.data || response.data?.models || []
+
+    // 筛选视频生成模型
+    const videoModels = models.filter(m =>
+      m.id?.includes('video') ||
+      m.id?.includes('kling') ||
+      m.id?.includes('wanx') ||
+      m.id?.includes('runway') ||
+      m.id?.includes('sora') ||
+      m.type === 'video' ||
+      m.capabilities?.includes('video')
+    )
+
+    // 添加到动态模型列表
+    videoModels.forEach(m => {
+      const id = m.id
+      if (!dynamicVideoModels[id]) {
+        dynamicVideoModels[id] = {
+          name: m.name || m.id,
+          provider: 'dmxapi',
+          description: m.description || 'DMXAPI 视频生成模型',
+          apiUrl: `${DMX_CONFIG.baseUrl}/video/generations`,
+          duration: 5,
+          cost: m.pricing ? (m.pricing.input + m.pricing.output) * 1000000 : 0.3,
+          dmxModel: true
+        }
+      }
+    })
+
+    console.log(`从 DMXAPI 获取到 ${videoModels.length} 个视频模型`)
+  } catch (error) {
+    // DMXAPI 可能不支持 /models 端点或视频模型
+    // 使用默认模型列表，但添加 DMX 通用选项
+    if (DMX_CONFIG.apiKey) {
+      dynamicVideoModels['dmx-video'] = {
+        name: 'DMX 视频生成',
+        provider: 'dmxapi',
+        description: '通过 DMX API 调用视频生成（需确认支持）',
+        apiUrl: `${DMX_CONFIG.baseUrl}/video/generations`,
+        duration: 5,
+        cost: 0.3,
+        dmxModel: true
+      }
+    }
+  }
+}
+
+// 初始化时获取 DMXAPI 视频模型
+fetchDMXVideoModels()
+
 // 当前选中的视频模型
-let currentVideoModel = process.env.VIDEO_MODEL || 'kling-v1';
+let currentVideoModel = process.env.VIDEO_MODEL || 'kling-v1'
 
 // ==================== 多模型配置 ====================
 
@@ -1811,7 +1866,7 @@ app.post('/api/animate/generate', async (req, res) => {
     }
 
     // 获取视频模型配置
-    const videoConfig = VIDEO_MODELS[videoModel] || VIDEO_MODELS['kling-v1']
+    const videoConfig = dynamicVideoModels[videoModel] || dynamicVideoModels['kling-v1']
 
     // 生成动画提示词
     const prompt = generateAnimationPrompt(analysis, genre, style)
@@ -2076,10 +2131,14 @@ app.delete('/api/animate/:id', (req, res) => {
 })
 
 // 34. 获取视频模型列表
-app.get('/api/video-models', (req, res) => {
+// 34. 获取视频模型列表
+app.get('/api/video-models', async (req, res) => {
+  // 尝试刷新 DMXAPI 模型列表
+  await fetchDMXVideoModels()
+
   res.json({
     success: true,
-    models: VIDEO_MODELS,
+    models: dynamicVideoModels,
     currentModel: currentVideoModel
   })
 })
@@ -2088,7 +2147,7 @@ app.get('/api/video-models', (req, res) => {
 app.post('/api/video-models/switch', (req, res) => {
   try {
     const { model } = req.body
-    if (!VIDEO_MODELS[model]) {
+    if (!dynamicVideoModels[model]) {
       return res.status(400).json({ success: false, error: '无效的视频模型' })
     }
     currentVideoModel = model

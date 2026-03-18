@@ -5,8 +5,10 @@ const API_BASE = ''
 export default function SettingsPanel({ toast }) {
   const [textModels, setTextModels] = useState({})
   const [visionModels, setVisionModels] = useState({})
+  const [videoModels, setVideoModels] = useState({})
   const [currentTextModel, setCurrentTextModel] = useState('')
   const [currentVisionModel, setCurrentVisionModel] = useState('')
+  const [currentVideoModel, setCurrentVideoModel] = useState('')
   const [templates, setTemplates] = useState({})
   const [loading, setLoading] = useState(true)
   const [activeSection, setActiveSection] = useState('models')
@@ -28,13 +30,15 @@ export default function SettingsPanel({ toast }) {
   const loadSettings = async () => {
     setLoading(true)
     try {
-      const [modelsRes, templatesRes] = await Promise.all([
+      const [modelsRes, templatesRes, videoModelsRes] = await Promise.all([
         fetch(`${API_BASE}/api/models`),
-        fetch(`${API_BASE}/api/templates`)
+        fetch(`${API_BASE}/api/templates`),
+        fetch(`${API_BASE}/api/video-models`)
       ])
 
       const modelsData = await modelsRes.json()
       const templatesData = await templatesRes.json()
+      const videoModelsData = await videoModelsRes.json()
 
       if (modelsData.success) {
         setTextModels(modelsData.textModels)
@@ -46,6 +50,11 @@ export default function SettingsPanel({ toast }) {
       if (templatesData.success) {
         setTemplates(templatesData.templates)
       }
+
+      if (videoModelsData.success) {
+        setVideoModels(videoModelsData.models)
+        setCurrentVideoModel(videoModelsData.currentModel)
+      }
     } catch (err) {
       toast.error('加载设置失败')
     }
@@ -54,19 +63,25 @@ export default function SettingsPanel({ toast }) {
 
   const switchModel = async (type, model) => {
     try {
-      const res = await fetch(`${API_BASE}/api/models/switch`, {
+      const endpoint = type === 'video' ? '/api/video-models/switch' : '/api/models/switch'
+      const body = type === 'video'
+        ? { model }
+        : {
+            textModel: type === 'text' ? model : undefined,
+            visionModel: type === 'vision' ? model : undefined
+          }
+
+      const res = await fetch(`${API_BASE}${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          textModel: type === 'text' ? model : undefined,
-          visionModel: type === 'vision' ? model : undefined
-        })
+        body: JSON.stringify(body)
       })
 
       const data = await res.json()
       if (data.success) {
         if (type === 'text') setCurrentTextModel(model)
-        else setCurrentVisionModel(model)
+        else if (type === 'vision') setCurrentVisionModel(model)
+        else if (type === 'video') setCurrentVideoModel(model)
         toast.success('模型已切换')
       }
     } catch (err) {
@@ -311,6 +326,35 @@ export default function SettingsPanel({ toast }) {
                 </div>
               ))}
             </div>
+          </div>
+
+          {/* 视频模型选择 */}
+          <div className="settings-group">
+            <h3>🎬 视频生成模型</h3>
+            <p className="settings-desc">用于名画动画功能，将静态画作生成动态视频</p>
+            <div className="model-grid video-model-grid">
+              {Object.entries(videoModels).map(([id, model]) => (
+                <div
+                  key={id}
+                  className={`model-card ${currentVideoModel === id ? 'active' : ''}`}
+                  onClick={() => switchModel('video', id)}
+                >
+                  <div className="model-header">
+                    <div className="model-name">{model.name}</div>
+                    <span className="provider-badge">{model.provider}</span>
+                  </div>
+                  <div className="model-desc">{model.description}</div>
+                  <div className="model-footer">
+                    <span className="model-cost">¥{model.cost}/次</span>
+                    <span className="model-duration">{model.duration}秒视频</span>
+                  </div>
+                  {currentVideoModel === id && <span className="model-check">✓</span>}
+                </div>
+              ))}
+            </div>
+            <p className="settings-hint">
+              💡 提示：不同视频模型需要配置对应的 API Key（KLING_API_KEY、ALIYUN_API_KEY、RUNWAY_API_KEY 或使用 DMX_API_KEY）
+            </p>
           </div>
         </div>
       )}

@@ -3939,3 +3939,52 @@ button:focus-visible {
   background: var(--gradientStart);
   border-radius: 8px;
 }
+
+/* 视频模型设置面板样式 */
+.video-model-grid .model-card {
+  position: relative;
+}
+
+.video-model-grid .provider-badge {
+  font-size: 10px;
+  padding: 2px 6px;
+  background: rgba(139, 69, 19, 0.1);
+  border-radius: 4px;
+  color: var(--primary);
+  margin-left: 8px;
+}
+
+.video-model-grid .model-card.active .provider-badge {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+}
+
+.video-model-grid .model-cost {
+  font-size: 12px;
+  color: var(--secondary);
+  font-weight: 500;
+}
+
+.video-model-grid .model-duration {
+  font-size: 11px;
+  color: var(--text);
+  opacity: 0.6;
+}
+
+.video-model-grid .model-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 8px;
+}
+
+.settings-hint {
+  font-size: 12px;
+  color: var(--text);
+  opacity: 0.6;
+  margin-top: 12px;
+  padding: 8px 12px;
+  background: var(--gradientStart);
+  border-radius: 8px;
+  line-height: 1.5;
+}
