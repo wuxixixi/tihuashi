@@ -178,22 +178,19 @@ docker-compose build 2>/dev/null || docker-compose build --no-cache
 docker-compose up -d
 echo "✓ Docker 服务已启动"
 
-# 8. 配置 cron 定时任务
+# 8. 配置 cron 定时任务（心跳机制）
 echo "配置定时任务..."
 cat > /etc/cron.d/moyun-tasks << 'CRON_EOF'
-# 墨韵 AI 定时任务
+# 墨韵 AI 心跳机制
 SHELL=/bin/bash
 PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
 
-# 每小时执行：检查服务、拉取更新、部署
-0 * * * * root source /root/scripts/.env && /root/scripts/hourly-task.sh >> /var/log/moyun-hourly.log 2>&1
-
-# 每天早上8点执行：自检并创建 Issue
-0 8 * * * root source /root/scripts/.env && /root/scripts/selfcheck.sh >> /var/log/tihuashi-selfcheck.log 2>&1
+# 每小时执行心跳：检查服务、拉取更新、部署、分析改进
+0 * * * * root source /root/scripts/.env && /root/scripts/heartbeat.sh >> /var/log/moyun-heartbeat.log 2>&1
 CRON_EOF
 chmod 644 /etc/cron.d/moyun-tasks
 service cron reload 2>/dev/null || systemctl reload cron 2>/dev/null || true
-echo "✓ 定时任务已配置"
+echo "✓ 心跳定时任务已配置（每小时执行）"
 
 # 9. 显示状态
 echo ""
