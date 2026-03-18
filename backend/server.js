@@ -309,6 +309,21 @@ db.exec(`
     key TEXT PRIMARY KEY,
     value TEXT,
     updatedAt TEXT
+  );
+
+  CREATE TABLE IF NOT EXISTS animations (
+    id TEXT PRIMARY KEY,
+    historyId TEXT,
+    imageUrl TEXT NOT NULL,
+    prompt TEXT,
+    videoUrl TEXT,
+    thumbnailUrl TEXT,
+    status TEXT DEFAULT 'pending',
+    provider TEXT DEFAULT 'kling',
+    cost REAL DEFAULT 0,
+    errorMessage TEXT,
+    createdAt TEXT,
+    FOREIGN KEY (historyId) REFERENCES history(id)
   )
 `);
 
@@ -1671,6 +1686,278 @@ app.get('/api/stats', (req, res) => {
     })
   } catch (error) {
     console.error('获取统计失败:', error)
+    res.status(500).json({ success: false, error: error.message })
+  }
+})
+
+// ==================== 名画动画 API ====================
+
+// 动画风格提示词模板
+const ANIMATION_STYLES = {
+  '山水': {
+    style: '山水画风格，水墨晕染效果',
+    elements: ['云雾缓缓流动', '瀑布倾泻而下', '松柏随风摇曳', '水波轻轻荡漾', '飞鸟掠过天空', '云层缓缓飘移']
+  },
+  '花鸟': {
+    style: '工笔花鸟风格，细腻优雅',
+    elements: ['花瓣轻轻飘落', '蝴蝶翩翩飞舞', '鸟儿展翅欲飞', '枝条随风轻摇', '露珠滚动滴落', '蜜蜂嗡嗡采蜜']
+  },
+  '人物': {
+    style: '古典人物画风格，意境深远',
+    elements: ['衣袂随风飘动', '眼神流转顾盼', '手势轻柔移动', '发丝轻轻飘扬', '扇子轻摇', '琴声悠扬']
+  },
+  '写意': {
+    style: '写意画风格，笔墨灵动',
+    elements: ['墨色缓缓晕染', '笔触流动扩散', '意境渐次展开', '留白处光影变幻']
+  },
+  '工笔': {
+    style: '工笔重彩风格，精细华丽',
+    elements: ['色彩渐次显现', '细节逐一展现', '金粉闪烁', '丝绸质感流动']
+  }
+}
+
+// 生成动画提示词
+function generateAnimationPrompt(analysis, genre, style = 'natural') {
+  // 根据流派选择动画风格
+  let animStyle = ANIMATION_STYLES['山水'] // 默认山水
+  for (const key of Object.keys(ANIMATION_STYLES)) {
+    if (genre && genre.includes(key)) {
+      animStyle = ANIMATION_STYLES[key]
+      break
+    }
+  }
+
+  // 从元素中随机选择2-3个
+  const numElements = 2 + Math.floor(Math.random() * 2)
+  const selectedElements = []
+  const elementsCopy = [...animStyle.elements]
+  for (let i = 0; i < numElements && elementsCopy.length > 0; i++) {
+    const idx = Math.floor(Math.random() * elementsCopy.length)
+    selectedElements.push(elementsCopy.splice(idx, 1)[0])
+  }
+
+  // 构建提示词
+  const styleMap = {
+    'natural': '自然流畅的动画',
+    'artistic': '艺术化的抽象动画',
+    'classical': '古典优雅的动画'
+  }
+
+  const prompt = `${animStyle.style}，${styleMap[style] || '自然流畅的动画'}。画面中${selectedElements.join('，')}。整体氛围宁静悠远，符合中国画意境。保持原画构图和色彩，动态元素自然融入。`
+
+  return prompt
+}
+
+// 30. 生成动画
+app.post('/api/animate/generate', async (req, res) => {
+  try {
+    const { imageUrl, analysis, genre, historyId, style = 'natural' } = req.body
+
+    if (!imageUrl) {
+      return res.status(400).json({ success: false, error: '请提供画作图片' })
+    }
+
+    // 生成动画提示词
+    const prompt = generateAnimationPrompt(analysis, genre, style)
+
+    // 创建动画记录
+    const animationId = uuidv4()
+    db.prepare(`
+      INSERT INTO animations (id, historyId, imageUrl, prompt, status, provider, createdAt)
+      VALUES (?, ?, ?, ?, 'pending', 'kling', ?)
+    `).run(animationId, historyId || null, imageUrl, prompt, new Date().toISOString())
+
+    // 调用可灵API生成视频
+    try {
+      // 获取图片的完整URL
+      let fullImageUrl = imageUrl
+      if (!imageUrl.startsWith('http')) {
+        // 如果是相对路径，转换为完整URL
+        const host = req.get('host')
+        const protocol = req.protocol
+        fullImageUrl = `${protocol}://${host}${imageUrl}`
+      }
+
+      // 可灵API调用
+      const klingApiKey = process.env.KLING_API_KEY || process.env.DMX_API_KEY
+      const klingApiUrl = process.env.KLING_API_URL || 'https://api.klingai.com/v1/videos/image2video'
+
+      console.log('调用可灵API生成视频:', fullImageUrl)
+
+      const klingResponse = await axios.post(klingApiUrl, {
+        model: 'kling-v1',
+        image_url: fullImageUrl,
+        prompt: prompt,
+        duration: 5,
+        cfg_scale: 0.5,
+        mode: 'std' // std 或 pro
+      }, {
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${klingApiKey}`
+        },
+        timeout: 30000
+      })
+
+      const taskId = klingResponse.data?.data?.task_id || klingResponse.data?.task_id
+
+      // 更新记录
+      db.prepare(`
+        UPDATE animations SET status = 'processing', provider = 'kling'
+        WHERE id = ?
+      `).run(animationId)
+
+      res.json({
+        success: true,
+        animationId,
+        prompt,
+        taskId,
+        status: 'processing',
+        message: '视频生成任务已提交，请稍后查询状态'
+      })
+
+    } catch (apiError) {
+      console.error('可灵API调用失败:', apiError.response?.data || apiError.message)
+
+      // 如果API调用失败，使用模拟模式
+      if (process.env.NODE_ENV === 'development' || !process.env.KLING_API_KEY) {
+        console.log('使用模拟模式生成视频')
+
+        // 更新为模拟完成状态
+        db.prepare(`
+          UPDATE animations SET status = 'completed', videoUrl = ?, errorMessage = '模拟模式'
+          WHERE id = ?
+        `).run(imageUrl, animationId) // 模拟模式下返回原图作为"视频"
+
+        res.json({
+          success: true,
+          animationId,
+          prompt,
+          status: 'completed',
+          message: '模拟模式：视频生成完成',
+          demo: true
+        })
+      } else {
+        // 更新失败状态
+        db.prepare(`
+          UPDATE animations SET status = 'failed', errorMessage = ?
+          WHERE id = ?
+        `).run(apiError.response?.data?.message || apiError.message, animationId)
+
+        res.status(500).json({
+          success: false,
+          error: '视频生成失败: ' + (apiError.response?.data?.message || apiError.message)
+        })
+      }
+    }
+
+  } catch (error) {
+    console.error('生成动画失败:', error)
+    res.status(500).json({ success: false, error: error.message })
+  }
+})
+
+// 31. 查询动画状态
+app.get('/api/animate/:id/status', async (req, res) => {
+  try {
+    const animation = db.prepare('SELECT * FROM animations WHERE id = ?').get(req.params.id)
+
+    if (!animation) {
+      return res.status(404).json({ success: false, error: '动画记录不存在' })
+    }
+
+    // 如果还在处理中，查询API状态
+    if (animation.status === 'processing' && animation.provider === 'kling') {
+      try {
+        const klingApiKey = process.env.KLING_API_KEY || process.env.DMX_API_KEY
+        const statusUrl = `https://api.klingai.com/v1/videos/image2video/${req.params.id}`
+
+        const statusResponse = await axios.get(statusUrl, {
+          headers: {
+            'Authorization': `Bearer ${klingApiKey}`
+          }
+        })
+
+        const taskStatus = statusResponse.data?.data?.task_status
+        const videoUrl = statusResponse.data?.data?.video_url
+
+        if (taskStatus === 'succeed' && videoUrl) {
+          db.prepare(`
+            UPDATE animations SET status = 'completed', videoUrl = ?
+            WHERE id = ?
+          `).run(videoUrl, req.params.id)
+
+          animation.status = 'completed'
+          animation.videoUrl = videoUrl
+        } else if (taskStatus === 'failed') {
+          db.prepare(`
+            UPDATE animations SET status = 'failed', errorMessage = ?
+            WHERE id = ?
+          `).run(statusResponse.data?.data?.task_status_msg || '生成失败', req.params.id)
+
+          animation.status = 'failed'
+        }
+      } catch (e) {
+        console.error('查询视频状态失败:', e.message)
+      }
+    }
+
+    res.json({
+      success: true,
+      animation: {
+        id: animation.id,
+        imageUrl: animation.imageUrl,
+        prompt: animation.prompt,
+        videoUrl: animation.videoUrl,
+        status: animation.status,
+        errorMessage: animation.errorMessage,
+        createdAt: animation.createdAt
+      }
+    })
+
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message })
+  }
+})
+
+// 32. 获取动画历史
+app.get('/api/animations', (req, res) => {
+  try {
+    const { page = 1, pageSize = 20 } = req.query
+    const pageNum = Math.max(1, parseInt(page))
+    const size = Math.min(50, Math.max(1, parseInt(pageSize) || 20))
+    const offset = (pageNum - 1) * size
+
+    const { total } = db.prepare('SELECT COUNT(*) as total FROM animations').get()
+    const animations = db.prepare(`
+      SELECT a.*, h.title, h.poem
+      FROM animations a
+      LEFT JOIN history h ON a.historyId = h.id
+      ORDER BY a.createdAt DESC
+      LIMIT ? OFFSET ?
+    `).all(size, offset)
+
+    res.json({
+      success: true,
+      animations,
+      pagination: {
+        page: pageNum,
+        pageSize: size,
+        total,
+        totalPages: Math.ceil(total / size)
+      }
+    })
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message })
+  }
+})
+
+// 33. 删除动画
+app.delete('/api/animate/:id', (req, res) => {
+  try {
+    db.prepare('DELETE FROM animations WHERE id = ?').run(req.params.id)
+    res.json({ success: true, message: '动画记录已删除' })
+  } catch (error) {
     res.status(500).json({ success: false, error: error.message })
   }
 })

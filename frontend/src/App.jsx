@@ -3,6 +3,7 @@ import { useToast } from './contexts/ToastContext'
 import { useConfirm } from './components/ConfirmDialog'
 import UploadPanel from './components/UploadPanel'
 import PoemPanel from './components/PoemPanel'
+import AnimationPanel from './components/AnimationPanel'
 import HistoryPanel from './components/HistoryPanel'
 import GalleryPanel from './components/GalleryPanel'
 import SettingsPanel from './components/SettingsPanel'
@@ -357,6 +358,16 @@ function App() {
                 onSaveRecord={saveRecord}
                 genre={genre}
               />
+              {/* 名画动画功能 - 分析完成后显示 */}
+              {analysis && image && (
+                <AnimationPanel
+                  image={image}
+                  analysis={analysis}
+                  genre={genre}
+                  historyId={null}
+                  toast={toast}
+                />
+              )}
             </div>
           )}
         </>
