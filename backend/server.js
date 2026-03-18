@@ -472,7 +472,9 @@ function parseTitleAndPoem(raw) {
   if (lines.length === 0) return { title: '无题', poem: raw };
   const first = lines[0];
   if (first.length <= 30 && !first.includes('。') && !first.includes('，')) {
-    return { title: first, poem: lines.slice(1).join('\n') || raw };
+    // 去除标题首尾的 ** 符号（Markdown 粗体标记）
+    let title = first.replace(/^\*+|\*+$/g, '').trim();
+    return { title: title || '无题', poem: lines.slice(1).join('\n') || raw };
   }
   return { title: '无题', poem: raw };
 }
@@ -949,7 +951,7 @@ ${poem}
     const poemMatch = raw.match(/【润色诗词】\s*([\s\S]+?)(?=【修改说明】|$)/)
     const suggestMatch = raw.match(/【修改说明】\s*([\s\S]+)$/)
 
-    if (titleMatch) polishedTitle = titleMatch[1].trim()
+    if (titleMatch) polishedTitle = titleMatch[1].trim().replace(/^\*+|\*+$/g, '').trim()
     if (poemMatch) polishedPoem = poemMatch[1].trim()
     if (suggestMatch) suggestions = suggestMatch[1].trim()
 
@@ -1007,7 +1009,7 @@ ${poem}
     const titleMatch = raw.match(/【新标题】\s*(.+)/)
     const poemMatch = raw.match(/【新诗词】\s*([\s\S]+)$/)
 
-    if (titleMatch) newTitle = titleMatch[1].trim()
+    if (titleMatch) newTitle = titleMatch[1].trim().replace(/^\*+|\*+$/g, '').trim()
     if (poemMatch) newPoem = poemMatch[1].trim()
 
     res.json({
