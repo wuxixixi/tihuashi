@@ -333,7 +333,10 @@ export default function SettingsPanel({ toast }) {
             <h3>🎬 视频生成模型</h3>
             <p className="settings-desc">用于名画动画功能，将静态画作生成动态视频</p>
             <div className="model-grid video-model-grid">
-              {Object.entries(videoModels).map(([id, model]) => (
+              {Object.entries(videoModels)
+                .filter(([id, model]) => model.available !== false)
+                .slice(0, 4)
+                .map(([id, model]) => (
                 <div
                   key={id}
                   className={`model-card ${currentVideoModel === id ? 'active' : ''}`}
@@ -346,14 +349,14 @@ export default function SettingsPanel({ toast }) {
                   <div className="model-desc">{model.description}</div>
                   <div className="model-footer">
                     <span className="model-cost">¥{model.cost}/次</span>
-                    <span className="model-duration">{model.duration}秒视频</span>
+                    <span className="model-duration">{model.duration}秒</span>
                   </div>
                   {currentVideoModel === id && <span className="model-check">✓</span>}
                 </div>
               ))}
             </div>
             <p className="settings-hint">
-              💡 提示：不同视频模型需要配置对应的 API Key（KLING_API_KEY、ALIYUN_API_KEY、RUNWAY_API_KEY 或使用 DMX_API_KEY）
+              💡 视频模型通过 DMXAPI 调用，费用约 ¥{videoModels[Object.keys(videoModels)[0]]?.cost || 0.3}/次
             </p>
           </div>
         </div>
