@@ -153,10 +153,10 @@ const FALLBACK_VIDEO_MODELS = {
 
 // 动态视频模型列表
 let dynamicVideoModels = {}
-let dmxVideoModelsAvailable = false
 
 // 从 DMXAPI 获取视频模型列表
 async function fetchDMXVideoModels() {
+  // 如果没有配置 DMXAPI Key，使用备用模型
   if (!DMX_CONFIG.apiKey) {
     console.log('DMXAPI Key 未配置，使用备用视频模型')
     dynamicVideoModels = { ...FALLBACK_VIDEO_MODELS }
@@ -174,39 +174,56 @@ async function fetchDMXVideoModels() {
 
     const models = response.data?.data || response.data?.models || []
 
-    // 筛选视频生成模型（更全面的筛选）
-    const videoKeywords = ['video', 'kling', 'wanx', 'runway', 'sora', 'cogvideo', 'svd', 'animatediff', 'image-to-video', 'img2vid']
-    const videoModels = models.filter(m => {
+    // 筛选视频生成模型（只保留图生视频模型）
+    const videoKeywords = ['image2video', 'img2vid', 'image-to-video', 'kling.*image', 'sora']
+    const imageToVideoModels = models.filter(m => {
       const id = (m.id || '').toLowerCase()
-      const name = (m.name || '').toLowerCase()
-      const type = (m.type || '').toLowerCase()
-      return videoKeywords.some(kw => id.includes(kw) || name.includes(kw)) ||
-             type === 'video' ||
-             m.capabilities?.includes?.('video') ||
-             m.capabilities?.includes?.('image-to-video')
+      // 优先选择图生视频模型
+      return id.includes('image2video') ||
+             id.includes('img2vid') ||
+             id.includes('image-to-video') ||
+             (id.includes('kling') && id.includes('image'))
     })
 
-    if (videoModels.length > 0) {
-      // 只取前4个可用模型
-      const topModels = videoModels.slice(0, 4)
+    // 如果找到图生视频模型，只使用这些
+    let selectedModels = imageToVideoModels
+
+    // 如果没找到图生视频模型，使用所有视频相关模型
+    if (selectedModels.length === 0) {
+      selectedModels = models.filter(m => {
+        const id = (m.id || '').toLowerCase()
+        const name = (m.name || '').toLowerCase()
+        return id.includes('video') ||
+               id.includes('kling') ||
+               id.includes('sora') ||
+               id.includes('wanx') ||
+               name.includes('video')
+      })
+    }
+
+    // 只取前4个
+    selectedModels = selectedModels.slice(0, 4)
+
+    if (selectedModels.length > 0) {
+      // 重置模型列表，只使用 DMXAPI 的模型
       dynamicVideoModels = {}
 
-      topModels.forEach(m => {
+      selectedModels.forEach(m => {
         const id = m.id
         dynamicVideoModels[id] = {
           name: m.name || m.id,
           provider: 'dmxapi',
           description: m.description || 'DMXAPI 视频生成',
           duration: 5,
-          cost: m.pricing ? (m.pricing.input + m.pricing.output) * 1000000 : 0.3,
+          cost: m.pricing ? m.pricing.input * 1000000 : 0.3,
           available: true,
           dmxModel: true
         }
       })
 
-      dmxVideoModelsAvailable = true
-      console.log(`从 DMXAPI 获取到 ${videoModels.length} 个视频模型，使用前 ${Object.keys(dynamicVideoModels).length} 个`)
+      console.log(`使用 DMXAPI 视频模型: ${Object.keys(dynamicVideoModels).join(', ')}`)
     } else {
+      // DMXAPI 没有视频模型，使用备用列表
       console.log('DMXAPI 未返回视频模型，使用备用列表')
       dynamicVideoModels = { ...FALLBACK_VIDEO_MODELS }
     }
@@ -220,7 +237,7 @@ async function fetchDMXVideoModels() {
 fetchDMXVideoModels()
 
 // 当前选中的视频模型
-let currentVideoModel = process.env.VIDEO_MODEL || ''
+let currentVideoModel = ''
 
 // ==================== 多模型配置 ====================
 
