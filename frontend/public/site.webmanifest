@@ -1,0 +1,20 @@
+{
+  "name": "墨韵 AI - 中国画智能赏析与诗词创作",
+  "short_name": "墨韵 AI",
+  "description": "上传中国画作品，AI 自动分析画作意境，创作符合画意的古诗词",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FDF5E6",
+  "theme_color": "#8B4513",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["entertainment", "lifestyle"],
+  "lang": "zh-CN"
+}

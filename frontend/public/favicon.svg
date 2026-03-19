@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#8B4513"/>
+      <stop offset="100%" style="stop-color:#D2691E"/>
+    </linearGradient>
+  </defs>
+  <!-- 背景圆形 -->
+  <circle cx="50" cy="50" r="48" fill="url(#bg)"/>
+  <!-- 墨韵文字 -->
+  <text x="50" y="58" text-anchor="middle" font-family="KaiTi, STKaiti, serif" font-size="32" font-weight="bold" fill="#FEF9E7">墨韵</text>
+  <!-- 装饰笔画 -->
+  <path d="M25 75 Q50 85 75 75" stroke="#DEB887" stroke-width="2" fill="none"/>
+</svg>

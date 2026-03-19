@@ -1,0 +1,6 @@
+# 墨韵 AI robots.txt
+User-agent: *
+Allow: /
+
+# Sitemap
+Sitemap: http://101.34.62.149/sitemap.xml

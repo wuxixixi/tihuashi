@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>生成分享预览图 - 墨韵 AI</title>
+  <style>
+    body {
+      font-family: 'Noto Serif SC', serif;
+      background: #FDF5E6;
+      padding: 40px;
+      text-align: center;
+    }
+    h1 { color: #8B4513; }
+    .preview {
+      margin: 20px auto;
+      border: 2px solid #DEB887;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .btn {
+      background: linear-gradient(135deg, #8B4513, #D2691E);
+      color: white;
+      border: none;
+      padding: 12px 30px;
+      font-size: 16px;
+      border-radius: 25px;
+      cursor: pointer;
+      margin: 10px;
+    }
+    .btn:hover { opacity: 0.9; }
+    .note {
+      color: #666;
+      font-size: 14px;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+  <h1>生成分享预览图</h1>
+  <p>点击下方按钮下载 PNG 格式的分享预览图</p>
+
+  <div class="preview">
+    <canvas id="canvas" width="1200" height="630"></canvas>
+  </div>
+
+  <button class="btn" onclick="downloadImage()">📥 下载 PNG 图片</button>
+
+  <p class="note">
+    下载后请将图片保存为 og-image.png 放到 public 目录下<br>
+    建议尺寸：1200 x 630 像素
+  </p>
+
+  <script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+
+    // 绘制背景
+    const gradient = ctx.createLinearGradient(0, 0, 1200, 630);
+    gradient.addColorStop(0, '#FDF5E6');
+    gradient.addColorStop(1, '#FEF9E7');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, 1200, 630);
+
+    // 绘制边框
+    ctx.strokeStyle = '#DEB887';
+    ctx.lineWidth = 3;
+    ctx.strokeRect(30, 30, 1140, 570);
+    ctx.lineWidth = 1;
+    ctx.strokeRect(45, 45, 1110, 540);
+
+    // 绘制山水装饰
+    ctx.globalAlpha = 0.3;
+    ctx.fillStyle = '#8B4513';
+    ctx.beginPath();
+    ctx.moveTo(80, 450);
+    ctx.quadraticCurveTo(130, 300, 180, 380);
+    ctx.quadraticCurveTo(230, 280, 280, 350);
+    ctx.quadraticCurveTo(330, 250, 380, 320);
+    ctx.lineTo(380, 450);
+    ctx.fill();
+
+    ctx.globalAlpha = 0.4;
+    ctx.fillStyle = '#A0522D';
+    ctx.beginPath();
+    ctx.moveTo(130, 450);
+    ctx.quadraticCurveTo(180, 350, 230, 400);
+    ctx.quadraticCurveTo(280, 320, 330, 370);
+    ctx.lineTo(330, 450);
+    ctx.fill();
+
+    // 绘制云
+    ctx.globalAlpha = 0.5;
+    ctx.fillStyle = '#D2B48C';
+    ctx.beginPath();
+    ctx.ellipse(160, 220, 60, 30, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(280, 180, 50, 25, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 绘制水
+    ctx.globalAlpha = 0.5;
+    ctx.fillStyle = '#DEB887';
+    ctx.beginPath();
+    ctx.moveTo(80, 450);
+    ctx.quadraticCurveTo(155, 440, 230, 450);
+    ctx.quadraticCurveTo(305, 460, 380, 450);
+    ctx.lineTo(380, 480);
+    ctx.lineTo(80, 480);
+    ctx.fill();
+
+    ctx.globalAlpha = 1;
+
+    // 绘制标题
+    ctx.fillStyle = '#3E2723';
+    ctx.font = 'bold 72px "KaiTi", "STKaiti", "Noto Serif SC", serif';
+    ctx.fillText('墨韵 AI', 450, 230);
+
+    // 绘制副标题
+    ctx.fillStyle = '#5D4037';
+    ctx.font = '32px "Noto Serif SC", serif';
+    ctx.fillText('中国画智能赏析与诗词创作', 450, 300);
+
+    // 绘制分隔线
+    const lineGradient = ctx.createLinearGradient(450, 0, 850, 0);
+    lineGradient.addColorStop(0, '#8B4513');
+    lineGradient.addColorStop(1, '#D2691E');
+    ctx.strokeStyle = lineGradient;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(450, 330);
+    ctx.lineTo(850, 330);
+    ctx.stroke();
+
+    // 绘制功能介绍
+    ctx.fillStyle = '#6D4C41';
+    ctx.font = '24px "Noto Serif SC", serif';
+    ctx.fillText('✦ 上传中国画，AI 自动赏析画意', 450, 380);
+    ctx.fillText('✦ 智能创作题画诗，多种风格可选', 450, 420);
+    ctx.fillText('✦ 书法风格导出，名画动画生成', 450, 460);
+
+    // 绘制底部文字
+    ctx.fillStyle = '#8D6E63';
+    ctx.font = '18px "Noto Serif SC", serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('让古典艺术与现代 AI 完美融合', 650, 550);
+
+    // 绘制印章
+    ctx.strokeStyle = '#C41E3A';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(1050, 500, 80, 60);
+    ctx.fillStyle = '#C41E3A';
+    ctx.font = '24px "KaiTi", serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('墨韵', 1090, 540);
+
+    function downloadImage() {
+      const link = document.createElement('a');
+      link.download = 'og-image.png';
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    }
+  </script>
+</body>
+</html>
