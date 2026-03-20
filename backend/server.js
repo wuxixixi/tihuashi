@@ -125,6 +125,7 @@ const FALLBACK_VIDEO_MODELS = {
     name: '可灵标准版',
     provider: 'kling',
     description: '快手可灵AI图生视频',
+    apiUrl: 'https://api.dmxapi.cn/v1/videos/image2video',
     duration: 5,
     cost: 0.5
   },
@@ -132,6 +133,7 @@ const FALLBACK_VIDEO_MODELS = {
     name: '通义万象',
     provider: 'aliyun',
     description: '阿里云视频生成',
+    apiUrl: 'https://api.dmxapi.cn/v1/videos/image2video',
     duration: 4,
     cost: 0.8
   },
@@ -139,6 +141,7 @@ const FALLBACK_VIDEO_MODELS = {
     name: 'Runway Gen-3',
     provider: 'runway',
     description: 'Runway视频生成',
+    apiUrl: 'https://api.dmxapi.cn/v1/videos/image2video',
     duration: 5,
     cost: 1.5
   },
@@ -146,6 +149,7 @@ const FALLBACK_VIDEO_MODELS = {
     name: 'Sora',
     provider: 'openai',
     description: 'OpenAI视频生成',
+    apiUrl: 'https://api.dmxapi.cn/v1/videos/image2video',
     duration: 5,
     cost: 2.0
   }
@@ -214,6 +218,7 @@ async function fetchDMXVideoModels() {
           name: m.name || m.id,
           provider: 'dmxapi',
           description: m.description || 'DMXAPI 视频生成',
+          apiUrl: `${DMX_CONFIG.baseUrl}/videos/image2video`,
           duration: 5,
           cost: m.pricing ? m.pricing.input * 1000000 : 0.3,
           available: true,
@@ -1880,7 +1885,20 @@ app.post('/api/animate/generate', async (req, res) => {
     }
 
     // 获取视频模型配置
-    const videoConfig = dynamicVideoModels[videoModel] || dynamicVideoModels['kling-v1']
+    let videoConfig = dynamicVideoModels[videoModel]
+
+    // 如果指定的模型不存在，使用第一个可用的模型
+    if (!videoConfig) {
+      const availableModels = Object.keys(dynamicVideoModels)
+      if (availableModels.length > 0) {
+        videoConfig = dynamicVideoModels[availableModels[0]]
+        console.log(`视频模型 ${videoModel} 不存在，使用 ${availableModels[0]}`)
+      } else {
+        // 如果没有任何模型，使用备用模型
+        videoConfig = FALLBACK_VIDEO_MODELS['kling-v1']
+        console.log('没有可用的视频模型，使用默认备用模型')
+      }
+    }
 
     // 生成动画提示词
     const prompt = generateAnimationPrompt(analysis, genre, style)
