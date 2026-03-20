@@ -1,0 +1,41 @@
+name: Deploy to Server
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:  # 支持手动触发
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Trigger deployment webhook
+        run: |
+          echo "触发部署 Webhook..."
+          response=$(curl -s -o response.txt -w "%{http_code}" \
+            -X POST \
+            -H "Content-Type: application/json" \
+            "${{ secrets.DEPLOY_WEBHOOK_URL }}" \
+            -d '{"ref":"${{ github.ref }}","sha":"${{ github.sha }}"}')
+
+          echo "HTTP 状态码: $response"
+          cat response.txt
+
+          if [ "$response" != "200" ]; then
+            echo "部署触发失败"
+            exit 1
+          fi
+
+          echo "部署已触发，服务将在后台执行"
+
+      - name: Summary
+        run: |
+          echo "## 部署状态" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit**: \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **分支**: \`${{ github.ref }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **触发者**: ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "部署任务已在服务器后台启动，请查看服务器日志确认部署结果。" >> $GITHUB_STEP_SUMMARY
