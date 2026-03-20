@@ -1908,52 +1908,86 @@ app.post('/api/animate/generate', async (req, res) => {
 
       // 根据不同的提供商调用不同的 API
       if (videoConfig.provider === 'dmxapi') {
-        // DMXAPI 视频生成 - 使用 chat completions 格式
-        // 视频生成需要较长时间，使用异步模式
-        const dmxResponse = await axios.post(`${DMX_CONFIG.baseUrl}/chat/completions`, {
-          model: videoModel,
-          messages: [
-            {
-              role: 'user',
-              content: [
-                { type: 'image_url', image_url: { url: fullImageUrl } },
-                { type: 'text', text: prompt || '让图片动起来，生成一个流畅的动画视频' }
-              ]
-            }
-          ],
-          max_tokens: 100
-        }, {
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${DMX_CONFIG.apiKey}`
-          },
-          timeout: 180000  // 视频生成需要更长时间，最多等待3分钟
-        })
+        // DMXAPI 视频生成
+        // 尝试使用 images/generations 端点（部分视频模型支持）
+        try {
+          const dmxResponse = await axios.post(`${DMX_CONFIG.baseUrl}/images/generations`, {
+            model: videoModel,
+            prompt: prompt || '让图片动起来',
+            image: fullImageUrl,
+            duration: videoConfig.duration || 5,
+            n: 1
+          }, {
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${DMX_CONFIG.apiKey}`
+            },
+            timeout: 180000
+          })
 
-        // 解析响应
-        const choice = dmxResponse.data?.choices?.[0]
-        if (choice?.message?.content) {
           // 检查是否返回了视频 URL
-          const content = choice.message.content
-          const videoMatch = content.match(/https?:\/\/[^\s"'<>]+\.(mp4|webm|mov)/i)
-          if (videoMatch) {
-            taskId = animationId
-            // 直接保存视频 URL
-            db.prepare(`UPDATE animations SET status = 'completed', videoUrl = ? WHERE id = ?`).run(videoMatch[0], animationId)
+          const videoUrl = dmxResponse.data?.data?.[0]?.url || dmxResponse.data?.data?.[0]?.video_url
+          if (videoUrl) {
+            db.prepare(`UPDATE animations SET status = 'completed', videoUrl = ? WHERE id = ?`).run(videoUrl, animationId)
             return res.json({
               success: true,
               animationId,
               prompt,
               status: 'completed',
-              videoUrl: videoMatch[0],
+              videoUrl,
               modelName: videoConfig.name,
               message: '视频生成完成'
             })
           }
-        }
 
-        taskId = dmxResponse.data?.id || animationId
-        apiResponse = dmxResponse.data
+          taskId = dmxResponse.data?.id || animationId
+          apiResponse = dmxResponse.data
+
+        } catch (imageError) {
+          // images/generations 失败，尝试 chat/completions
+          console.log('images/generations 失败，尝试 chat/completions...')
+          const dmxResponse = await axios.post(`${DMX_CONFIG.baseUrl}/chat/completions`, {
+            model: videoModel,
+            messages: [
+              {
+                role: 'user',
+                content: [
+                  { type: 'image_url', image_url: { url: fullImageUrl } },
+                  { type: 'text', text: prompt || '让图片动起来，生成一个流畅的动画视频' }
+                ]
+              }
+            ],
+            max_tokens: 100
+          }, {
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${DMX_CONFIG.apiKey}`
+            },
+            timeout: 180000
+          })
+
+          // 解析响应
+          const choice = dmxResponse.data?.choices?.[0]
+          if (choice?.message?.content) {
+            const content = choice.message.content
+            const videoMatch = content.match(/https?:\/\/[^\s"'<>]+\.(mp4|webm|mov)/i)
+            if (videoMatch) {
+              db.prepare(`UPDATE animations SET status = 'completed', videoUrl = ? WHERE id = ?`).run(videoMatch[0], animationId)
+              return res.json({
+                success: true,
+                animationId,
+                prompt,
+                status: 'completed',
+                videoUrl: videoMatch[0],
+                modelName: videoConfig.name,
+                message: '视频生成完成'
+              })
+            }
+          }
+
+          taskId = animationId
+          apiResponse = dmxResponse.data
+        }
 
       } else if (videoConfig.provider === 'kling') {
         // 可灵 API
@@ -2034,8 +2068,11 @@ app.post('/api/animate/generate', async (req, res) => {
     } catch (apiError) {
       console.error('视频API调用失败:', apiError.response?.data || apiError.message)
 
-      const errorMsg = apiError.response?.data?.error?.message || apiError.response?.data?.message || apiError.message
+      const errorData = apiError.response?.data
+      const errorMsg = errorData?.error?.message || errorData?.message || apiError.message
+      const errorCode = errorData?.error?.code || errorData?.code || ''
       const isTimeout = apiError.code === 'ECONNABORTED' || errorMsg.includes('timeout')
+      const isServiceError = errorCode === 'bad_response_status_code' || errorMsg.includes('502')
 
       // 超时可能是正常的（视频生成需要时间），设置为处理中状态
       if (isTimeout) {
@@ -2051,11 +2088,20 @@ app.post('/api/animate/generate', async (req, res) => {
         })
       }
 
+      // 服务暂时不可用
+      if (isServiceError) {
+        db.prepare(`UPDATE animations SET status = 'failed', errorMessage = ? WHERE id = ?`).run('视频生成服务暂时不可用', animationId)
+        return res.status(503).json({
+          success: false,
+          error: '视频生成服务暂时不可用',
+          tip: 'DMXAPI 视频生成服务当前不稳定，请稍后重试。如问题持续，请联系客服。',
+          detail: errorMsg,
+          suggestion: '您可以尝试：1. 稍后重试 2. 联系 DMXAPI 客服确认服务状态'
+        })
+      }
+
       // 其他错误，标记为失败
-      db.prepare(`
-        UPDATE animations SET status = 'failed', errorMessage = ?
-        WHERE id = ?
-      `).run(errorMsg, animationId)
+      db.prepare(`UPDATE animations SET status = 'failed', errorMessage = ? WHERE id = ?`).run(errorMsg, animationId)
 
       res.status(500).json({
         success: false,
