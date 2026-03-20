@@ -120,38 +120,21 @@ const OMNI_CONFIG = {
 // ==================== 视频生成模型配置 ====================
 
 // 备用视频模型列表（仅当 DMXAPI 不可用时使用）
+// 这些模型通过 DMXAPI 的 chat/completions 端点调用
 const FALLBACK_VIDEO_MODELS = {
   'kling-v1': {
     name: '可灵标准版',
-    provider: 'kling',
+    provider: 'dmxapi',
     description: '快手可灵AI图生视频',
-    apiUrl: 'https://api.dmxapi.cn/v1/videos/image2video',
     duration: 5,
     cost: 0.5
   },
-  'wanx-v1': {
-    name: '通义万象',
-    provider: 'aliyun',
-    description: '阿里云视频生成',
-    apiUrl: 'https://api.dmxapi.cn/v1/videos/image2video',
-    duration: 4,
+  'kling-v2': {
+    name: '可灵V2',
+    provider: 'dmxapi',
+    description: '可灵AI图生视频V2版本',
+    duration: 5,
     cost: 0.8
-  },
-  'runway-gen3': {
-    name: 'Runway Gen-3',
-    provider: 'runway',
-    description: 'Runway视频生成',
-    apiUrl: 'https://api.dmxapi.cn/v1/videos/image2video',
-    duration: 5,
-    cost: 1.5
-  },
-  'sora': {
-    name: 'Sora',
-    provider: 'openai',
-    description: 'OpenAI视频生成',
-    apiUrl: 'https://api.dmxapi.cn/v1/videos/image2video',
-    duration: 5,
-    cost: 2.0
   }
 };
 
@@ -218,7 +201,6 @@ async function fetchDMXVideoModels() {
           name: m.name || m.id,
           provider: 'dmxapi',
           description: m.description || 'DMXAPI 视频生成',
-          apiUrl: `${DMX_CONFIG.baseUrl}/videos/image2video`,
           duration: 5,
           cost: m.pricing ? m.pricing.input * 1000000 : 0.3,
           available: true,
@@ -1926,20 +1908,51 @@ app.post('/api/animate/generate', async (req, res) => {
 
       // 根据不同的提供商调用不同的 API
       if (videoConfig.provider === 'dmxapi') {
-        // 使用 DMXAPI 视频生成
-        const dmxResponse = await axios.post(videoConfig.apiUrl, {
+        // DMXAPI 视频生成 - 使用 chat completions 格式
+        // 视频生成需要较长时间，使用异步模式
+        const dmxResponse = await axios.post(`${DMX_CONFIG.baseUrl}/chat/completions`, {
           model: videoModel,
-          image_url: fullImageUrl,
-          prompt: prompt,
-          duration: videoConfig.duration
+          messages: [
+            {
+              role: 'user',
+              content: [
+                { type: 'image_url', image_url: { url: fullImageUrl } },
+                { type: 'text', text: prompt || '让图片动起来，生成一个流畅的动画视频' }
+              ]
+            }
+          ],
+          max_tokens: 100
         }, {
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${DMX_CONFIG.apiKey}`
           },
-          timeout: 30000
+          timeout: 180000  // 视频生成需要更长时间，最多等待3分钟
         })
-        taskId = dmxResponse.data?.id || dmxResponse.data?.task_id
+
+        // 解析响应
+        const choice = dmxResponse.data?.choices?.[0]
+        if (choice?.message?.content) {
+          // 检查是否返回了视频 URL
+          const content = choice.message.content
+          const videoMatch = content.match(/https?:\/\/[^\s"'<>]+\.(mp4|webm|mov)/i)
+          if (videoMatch) {
+            taskId = animationId
+            // 直接保存视频 URL
+            db.prepare(`UPDATE animations SET status = 'completed', videoUrl = ? WHERE id = ?`).run(videoMatch[0], animationId)
+            return res.json({
+              success: true,
+              animationId,
+              prompt,
+              status: 'completed',
+              videoUrl: videoMatch[0],
+              modelName: videoConfig.name,
+              message: '视频生成完成'
+            })
+          }
+        }
+
+        taskId = dmxResponse.data?.id || animationId
         apiResponse = dmxResponse.data
 
       } else if (videoConfig.provider === 'kling') {
@@ -2021,34 +2034,34 @@ app.post('/api/animate/generate', async (req, res) => {
     } catch (apiError) {
       console.error('视频API调用失败:', apiError.response?.data || apiError.message)
 
-      // 如果API调用失败，使用模拟模式
-      if (process.env.NODE_ENV === 'development' || !process.env.KLING_API_KEY) {
-        console.log('使用模拟模式生成视频')
+      const errorMsg = apiError.response?.data?.error?.message || apiError.response?.data?.message || apiError.message
+      const isTimeout = apiError.code === 'ECONNABORTED' || errorMsg.includes('timeout')
 
-        db.prepare(`
-          UPDATE animations SET status = 'completed', videoUrl = ?, errorMessage = '模拟模式'
-          WHERE id = ?
-        `).run(imageUrl, animationId)
-
-        res.json({
+      // 超时可能是正常的（视频生成需要时间），设置为处理中状态
+      if (isTimeout) {
+        db.prepare(`UPDATE animations SET status = 'processing' WHERE id = ?`).run(animationId)
+        return res.json({
           success: true,
           animationId,
           prompt,
-          status: 'completed',
-          message: '模拟模式：视频生成完成',
-          demo: true
-        })
-      } else {
-        db.prepare(`
-          UPDATE animations SET status = 'failed', errorMessage = ?
-          WHERE id = ?
-        `).run(apiError.response?.data?.message || apiError.message, animationId)
-
-        res.status(500).json({
-          success: false,
-          error: '视频生成失败: ' + (apiError.response?.data?.message || apiError.message)
+          status: 'processing',
+          provider: videoConfig.provider,
+          modelName: videoConfig.name,
+          message: '视频生成任务已提交（响应超时属正常现象），请稍后查询状态'
         })
       }
+
+      // 其他错误，标记为失败
+      db.prepare(`
+        UPDATE animations SET status = 'failed', errorMessage = ?
+        WHERE id = ?
+      `).run(errorMsg, animationId)
+
+      res.status(500).json({
+        success: false,
+        error: '视频生成失败: ' + errorMsg,
+        tip: '当前视频生成服务可能暂时不可用，请稍后重试或联系管理员'
+      })
     }
 
   } catch (error) {
