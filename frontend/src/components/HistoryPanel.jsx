@@ -1,8 +1,12 @@
 import { useState, useEffect, useCallback } from 'react'
 import MarkdownRenderer from './MarkdownRenderer'
+<<<<<<< Updated upstream
 import LazyImage from './LazyImage'
 
 const API_BASE = ''
+=======
+import API_BASE from '../config'
+>>>>>>> Stashed changes
 
 // 常用标签建议
 const SUGGESTED_TAGS = ['山水', '花鸟', '人物', '写意', '工笔', '精品', '收藏', '思乡', '送别', '田园', '边塞', '怀古']

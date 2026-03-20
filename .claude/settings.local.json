@@ -1,6 +1,7 @@
 {
   "permissions": {
     "allow": [
+<<<<<<< Updated upstream
       "Bash(cd backend:*)",
       "Bash(cd frontend:*)",
       "Bash(sleep:*)",
@@ -31,6 +32,9 @@
       "Bash(timeout:*)",
       "Bash(ssh:*)",
       "Bash(chmod:*)"
+=======
+      "Bash(cat > \"H:/tihuashi/backend/.env.example\" << 'EOF'\n# 墨韵 AI 环境变量配置\n# 复制此文件为 .env 并填入实际值\n\n# 服务端口\nPORT=3001\n\n# DMX API 配置\nDMX_API_KEY=your_api_key_here\nDMX_BASE_URL=https://www.dmxapi.cn/v1\nDMX_MODEL=gpt-5-mini\n\n# 视觉模型配置\nVISION_MODEL=Doubao-1.5-vision-pro-32k\n\n# 数据库路径（可选，默认为 ./moyun.db）\n# DB_PATH=./moyun.db\nEOF)"
+>>>>>>> Stashed changes
     ]
   }
 }

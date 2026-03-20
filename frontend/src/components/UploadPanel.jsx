@@ -1,8 +1,7 @@
 import { useRef, useState, useEffect } from 'react'
 import LoadingProgress from './LoadingProgress'
 import MarkdownRenderer from './MarkdownRenderer'
-
-const API_BASE = ''
+import API_BASE from '../config'
 
 export default function UploadPanel({ image, setImage, imagePath, setImagePath, analysis, setAnalysis, feeling, setFeeling, loadingStage, setLoadingStage, toast, genre, setGenre }) {
   const fileInputRef = useRef(null)

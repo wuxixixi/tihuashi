@@ -660,9 +660,10 @@ app.post('/api/upload', upload.single('image'), async (req, res) => {
 app.post('/api/analyze', async (req, res) => {
   try {
     const { imagePath } = req.body;
-    if (!imagePath || !fs.existsSync(imagePath)) {
+    if (!imagePath || typeof imagePath !== 'string') {
       return res.status(400).json({ success: false, error: '图片路径无效' });
     }
+<<<<<<< Updated upstream
 
     // 检查缓存
     const cacheKey = generateCacheKey(imagePath);
@@ -673,8 +674,19 @@ app.post('/api/analyze', async (req, res) => {
     }
 
     const imageBuffer = fs.readFileSync(imagePath);
+=======
+    // 安全检查：防止路径遍历攻击
+    const resolvedPath = path.resolve(imagePath);
+    if (!resolvedPath.startsWith(uploadDir)) {
+      return res.status(400).json({ success: false, error: '图片路径无效' });
+    }
+    if (!fs.existsSync(resolvedPath)) {
+      return res.status(400).json({ success: false, error: '图片不存在' });
+    }
+    const imageBuffer = fs.readFileSync(resolvedPath);
+>>>>>>> Stashed changes
     const base64 = imageBuffer.toString('base64');
-    const ext = path.extname(imagePath).toLowerCase();
+    const ext = path.extname(resolvedPath).toLowerCase();
     const mime = ext === '.png' ? 'image/png' : ext === '.webp' ? 'image/webp' : 'image/jpeg';
     const dataUrl = `data:${mime};base64,${base64}`;
 
@@ -709,6 +721,21 @@ app.post('/api/analyze', async (req, res) => {
 app.post('/api/poem', async (req, res) => {
   try {
     const { analysis, userFeeling, style, customStyle } = req.body;
+
+    // 输入验证
+    if (!analysis || typeof analysis !== 'string') {
+      return res.status(400).json({ success: false, error: '赏析内容不能为空' });
+    }
+    if (analysis.length > 2000) {
+      return res.status(400).json({ success: false, error: '赏析内容过长（最多 2000 字）' });
+    }
+    if (userFeeling && userFeeling.length > 1000) {
+      return res.status(400).json({ success: false, error: '用户感悟过长（最多 1000 字）' });
+    }
+    if (customStyle && customStyle.length > 200) {
+      return res.status(400).json({ success: false, error: '自定义风格描述过长（最多 200 字）' });
+    }
+
     let stylePrompt;
     if (customStyle) {
       stylePrompt = `按照以下风格要求创作：${customStyle}`;
@@ -967,14 +994,24 @@ app.post('/api/history/batch', (req, res) => {
     if (!ids || !Array.isArray(ids) || ids.length === 0) {
       return res.status(400).json({ success: false, error: '请选择要操作的项目' })
     }
+    // 限制批量操作数量
+    if (ids.length > 100) {
+      return res.status(400).json({ success: false, error: '单次最多操作 100 条记录' })
+    }
 
     if (action === 'delete') {
       const placeholders = ids.map(() => '?').join(',')
-      db.prepare(`DELETE FROM history WHERE id IN (${placeholders})`).run(...ids)
+      const deleteMany = db.transaction(() => {
+        db.prepare(`DELETE FROM history WHERE id IN (${placeholders})`).run(...ids)
+      })
+      deleteMany()
       res.json({ success: true, deleted: ids.length })
     } else if (action === 'favorite') {
       const placeholders = ids.map(() => '?').join(',')
-      db.prepare(`UPDATE history SET favorite = ? WHERE id IN (${placeholders})`).run(data.favorite ? 1 : 0, ...ids)
+      const updateMany = db.transaction(() => {
+        db.prepare(`UPDATE history SET favorite = ? WHERE id IN (${placeholders})`).run(data.favorite ? 1 : 0, ...ids)
+      })
+      updateMany()
       res.json({ success: true, updated: ids.length })
     } else {
       res.status(400).json({ success: false, error: '未知操作' })

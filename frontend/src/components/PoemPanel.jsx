@@ -1,6 +1,10 @@
 import { useState } from 'react'
+<<<<<<< Updated upstream
 
 const API_BASE = ''
+=======
+import API_BASE from '../config'
+>>>>>>> Stashed changes
 
 const poemStyles = {
   '诗': ['五言绝句', '七言绝句', '五言律诗', '七言律诗', '古体诗'],

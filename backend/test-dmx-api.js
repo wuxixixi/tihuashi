@@ -1,11 +1,18 @@
 const axios = require('axios');
+require('dotenv').config();
 
-// DMXAPI 配置
+// DMXAPI 配置（从环境变量读取）
 const DMX_CONFIG = {
-  apiKey: 'sk-A12TQ5zlxcIyWlCwQjHpTc4P0mef1E19Kud2NEkShpRb1nAZ',
-  baseUrl: 'https://www.dmxapi.cn/v1',
-  model: 'gpt-5-mini'
+  apiKey: process.env.DMX_API_KEY || '',
+  baseUrl: process.env.DMX_BASE_URL || 'https://www.dmxapi.cn/v1',
+  model: process.env.DMX_MODEL || 'gpt-5-mini'
 };
+
+if (!DMX_CONFIG.apiKey) {
+  console.error('❌ 错误: 请设置环境变量 DMX_API_KEY');
+  console.error('   可以创建 .env 文件或直接设置环境变量');
+  process.exit(1);
+}
 
 const OMNI_CONFIG = {
   apiKey: DMX_CONFIG.apiKey,
