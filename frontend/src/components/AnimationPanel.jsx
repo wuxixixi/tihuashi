@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
-
-const API_BASE = ''
+import API_BASE from '../config'
 
 // 动画风格选项
 const ANIMATION_STYLES = [

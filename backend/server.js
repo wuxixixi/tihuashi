@@ -7,6 +7,8 @@ const { v4: uuidv4 } = require('uuid');
 const path = require('path');
 const fs = require('fs');
 const Database = require('better-sqlite3');
+const rateLimit = require('express-rate-limit');
+const imageType = require('image-type');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -15,44 +17,23 @@ const PORT = process.env.PORT || 3001;
 app.use(cors());
 app.use(express.json());
 app.use('/uploads', express.static('uploads'));
+const uploadLimiter = rateLimit({
+  windowMs: parseInt(process.env.UPLOAD_RATE_LIMIT_WINDOW_MS || '60000', 10),
+  max: parseInt(process.env.UPLOAD_RATE_LIMIT_MAX || '10', 10),
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, error: '上传请求过多，请稍后再试' }
+});
 
 // ==================== 性能优化 ====================
 
-// 内存缓存（用于 AI 分析结果）
-const analysisCache = new Map();
-const CACHE_TTL = 1000 * 60 * 30; // 30 分钟缓存
+// 使用模块化实现：cache, aiClient, analyzeQueue
+const { getCache, setCache, generateCacheKey } = require('./cache');
+const { callSparkAI, callQwenOmniImageToText } = require('./aiClient');
+const { initAnalyzeQueue } = require('./analyzeQueue');
 
-// 获取缓存
-function getCache(key) {
-  const item = analysisCache.get(key);
-  if (!item) return null;
-  if (Date.now() - item.timestamp > CACHE_TTL) {
-    analysisCache.delete(key);
-    return null;
-  }
-  return item.data;
-}
-
-// 设置缓存
-function setCache(key, data) {
-  analysisCache.set(key, { data, timestamp: Date.now() });
-}
-
-// 生成缓存 key（基于图片文件内容）
-function generateCacheKey(imagePath) {
-  const stats = fs.statSync(imagePath);
-  return `${imagePath}-${stats.size}-${stats.mtime.getTime()}`;
-}
-
-// 定期清理过期缓存
-setInterval(() => {
-  const now = Date.now();
-  for (const [key, item] of analysisCache) {
-    if (now - item.timestamp > CACHE_TTL) {
-      analysisCache.delete(key);
-    }
-  }
-}, 1000 * 60 * 10); // 每 10 分钟清理一次
+// 缓存配置（由 backend/cache.js 管理）
+const CACHE_TTL = parseInt(process.env.CACHE_TTL_MS || String(1000 * 60 * 30), 10); // 默认 30 分钟
 
 // 确保上传目录存在
 const uploadDir = path.join(__dirname, 'uploads');
@@ -462,25 +443,38 @@ function migrateFromJson() {
 }
 migrateFromJson();
 
+// 初始化异步分析队列管理器（依赖 uploadDir 与 loadTemplates）
+const analyzeQueueManager = initAnalyzeQueue({ uploadDir, loadTemplates });
+
 // ==================== AI 调用 ====================
 
-async function callSparkAI(messages, model = null) {
-  try {
-    const url = `${DMX_CONFIG.baseUrl}/chat/completions`;
-    const headers = {
-      'Accept': 'application/json',
-      'Authorization': DMX_CONFIG.apiKey,
-      'Content-Type': 'application/json'
-    };
-    const useModel = model || currentTextModel || DMX_CONFIG.model;
-    const payload = { model: useModel, messages };
-    console.log('AI Request - Model:', useModel, 'URL:', url);
-    const response = await axios.post(url, payload, { headers });
-    console.log('AI Response:', response.data?.choices?.[0]?.message ? 'OK' : response.data);
-    return response.data;
-  } catch (error) {
-    console.error('AI 调用失败:', error.response?.data || error.message);
-    throw error;
+async function callSparkAI(messages, model = null, options = {}) {
+  const timeoutMs = options.timeoutMs || 15000;
+  const retries = options.retries !== undefined ? options.retries : 2;
+  const url = `${DMX_CONFIG.baseUrl}/chat/completions`;
+  const headers = {
+    'Accept': 'application/json',
+    'Authorization': DMX_CONFIG.apiKey ? `Bearer ${DMX_CONFIG.apiKey}` : '',
+    'Content-Type': 'application/json'
+  };
+  const useModel = model || currentTextModel || DMX_CONFIG.model;
+  const payload = { model: useModel, messages };
+  console.log('AI Request - Model:', useModel, 'URL:', url);
+
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const response = await axios.post(url, payload, { headers, timeout: timeoutMs });
+      console.log('AI Response status:', response.status);
+      return response.data;
+    } catch (error) {
+      const isLast = attempt === retries;
+      console.error(`AI 调用失败（尝试 ${attempt + 1}/${retries + 1}）:`, error.response?.data || error.message);
+      if (isLast) {
+        throw error;
+      }
+      const backoff = Math.pow(2, attempt) * 1000;
+      await new Promise(r => setTimeout(r, backoff));
+    }
   }
 }
 
@@ -606,7 +600,7 @@ function parseTitleAndPoem(raw) {
 // ==================== API 路由 ====================
 
 // 1. 上传图片（支持压缩）
-app.post('/api/upload', upload.single('image'), async (req, res) => {
+app.post('/api/upload', uploadLimiter, upload.single('image'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: '请上传图片' });
 
   const originalPath = req.file.path;
@@ -615,6 +609,15 @@ app.post('/api/upload', upload.single('image'), async (req, res) => {
   const compressedPath = path.join(compressedDir, compressedFilename);
 
   try {
+    // 内容检测：基于文件头判断真实类型，防止伪装
+    const fileBuffer = fs.readFileSync(originalPath);
+    const detected = imageType(fileBuffer);
+    const allowedExts = ['jpg','jpeg','png','webp'];
+    if (!detected || !allowedExts.includes(detected.ext)) {
+      try { fs.unlinkSync(originalPath); } catch (_) {}
+      return res.status(400).json({ success: false, error: '仅支持 jpeg/jpg/png/webp 图片' });
+    }
+
     // 尝试压缩图片
     await compressImage(originalPath, compressedPath, 1200, 0.8);
 
@@ -636,6 +639,9 @@ app.post('/api/upload', upload.single('image'), async (req, res) => {
       fs.unlinkSync(compressedPath);
     }
 
+    // 尝试设置严格文件权限（Unix）
+    try { fs.chmodSync(finalPath, 0o600); } catch (_) {}
+
     res.json({
       success: true,
       url: finalUrl,
@@ -645,14 +651,11 @@ app.post('/api/upload', upload.single('image'), async (req, res) => {
       compressedSize: compressedSize < originalSize * 0.9 ? compressedSize : originalSize
     });
   } catch (err) {
-    // 压缩失败，使用原文件
-    console.error('图片压缩失败:', err.message);
-    res.json({
-      success: true,
-      url: `/uploads/${filename}`,
-      filename,
-      fullPath: originalPath
-    });
+    // 处理失败，清理文件
+    console.error('图片处理失败:', err.message || err);
+    try { fs.unlinkSync(compressedPath); } catch (_) {}
+    try { fs.unlinkSync(originalPath); } catch (_) {}
+    res.status(500).json({ success: false, error: '图片处理失败' });
   }
 });
 
@@ -663,19 +666,7 @@ app.post('/api/analyze', async (req, res) => {
     if (!imagePath || typeof imagePath !== 'string') {
       return res.status(400).json({ success: false, error: '图片路径无效' });
     }
-<<<<<<< Updated upstream
-
-    // 检查缓存
-    const cacheKey = generateCacheKey(imagePath);
-    const cached = getCache(cacheKey);
-    if (cached) {
-      console.log('使用缓存的分析结果');
-      return res.json({ success: true, ...cached, fromCache: true });
-    }
-
-    const imageBuffer = fs.readFileSync(imagePath);
-=======
-    // 安全检查：防止路径遍历攻击
+    // 安全检查：防止路径遍历攻击并确保文件存在
     const resolvedPath = path.resolve(imagePath);
     if (!resolvedPath.startsWith(uploadDir)) {
       return res.status(400).json({ success: false, error: '图片路径无效' });
@@ -683,8 +674,16 @@ app.post('/api/analyze', async (req, res) => {
     if (!fs.existsSync(resolvedPath)) {
       return res.status(400).json({ success: false, error: '图片不存在' });
     }
+
+    // 检查缓存（基于文件元数据）
+    const cacheKey = generateCacheKey(resolvedPath);
+    const cached = getCache(cacheKey);
+    if (cached) {
+      console.log('使用缓存的分析结果');
+      return res.json({ success: true, ...cached, fromCache: true });
+    }
+
     const imageBuffer = fs.readFileSync(resolvedPath);
->>>>>>> Stashed changes
     const base64 = imageBuffer.toString('base64');
     const ext = path.extname(resolvedPath).toLowerCase();
     const mime = ext === '.png' ? 'image/png' : ext === '.webp' ? 'image/webp' : 'image/jpeg';
@@ -715,6 +714,34 @@ app.post('/api/analyze', async (req, res) => {
     console.error('分析API错误:', error);
     res.status(500).json({ success: false, error: error.message });
   }
+});
+
+// 异步分析队列接口（短期内提供）
+// POST /api/analyze/queue -> { jobId }
+app.post('/api/analyze/queue', (req, res) => {
+  try {
+    const { imagePath } = req.body;
+    if (!imagePath || typeof imagePath !== 'string') {
+      return res.status(400).json({ success: false, error: '图片路径无效' });
+    }
+    // 如果是在测试环境，仍然建议使用同步接口以保持兼容性
+    if (process.env.NODE_ENV === 'test') {
+      return res.status(400).json({ success: false, error: '异步队列在测试环境不可用' });
+    }
+    const jobId = analyzeQueueManager.enqueueAnalyze(imagePath);
+    res.json({ success: true, jobId });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// GET /api/analyze/result?jobId=...
+app.get('/api/analyze/result', (req, res) => {
+  const { jobId } = req.query;
+  if (!jobId) return res.status(400).json({ success: false, error: 'jobId required' });
+  const job = analyzeQueueManager.getJob(jobId);
+  if (!job) return res.status(404).json({ success: false, error: 'job not found' });
+  res.json({ success: true, jobId, ...job });
 });
 
 // 3. 生成诗词

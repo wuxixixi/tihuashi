@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
-
-const API_BASE = ''
+import API_BASE from '../config'
 
 export default function SettingsPanel({ toast }) {
   const [textModels, setTextModels] = useState({})

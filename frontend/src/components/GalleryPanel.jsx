@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import LazyImage from './LazyImage'
-
-const API_BASE = ''
+import API_BASE from '../config'
 
 // 生成或获取会话ID
 function getSessionId() {

@@ -2042,7 +2042,7 @@ button:focus-visible {
   outline-offset: 2px;
 }
 
-<<<<<<< Updated upstream
+
 /* ==================== About Section ==================== */
 .about-section {
   max-width: 900px;
@@ -3988,7 +3988,6 @@ button:focus-visible {
   background: var(--gradientStart);
   border-radius: 8px;
   line-height: 1.5;
-=======
 /* ==================== Error Boundary ==================== */
 .error-boundary {
   display: flex;
@@ -4043,5 +4042,5 @@ button:focus-visible {
   overflow-x: auto;
   font-size: 0.8rem;
   color: #666;
->>>>>>> Stashed changes
+
 }
