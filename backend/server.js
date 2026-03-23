@@ -9,13 +9,22 @@ const fs = require('fs');
 const Database = require('better-sqlite3');
 const rateLimit = require('express-rate-limit');
 const imageType = require('image-type');
+const helmet = require('helmet');
+const compression = require('compression');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// 安全中间件
+app.use(helmet({
+  contentSecurityPolicy: false, // 允许内联样式
+  crossOriginEmbedderPolicy: false
+}));
+app.use(compression()); // 响应压缩
+
 // 中间件
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '1mb' })); // 限制请求体大小
 app.use('/uploads', express.static('uploads'));
 const uploadLimiter = rateLimit({
   windowMs: parseInt(process.env.UPLOAD_RATE_LIMIT_WINDOW_MS || '60000', 10),
@@ -445,118 +454,6 @@ migrateFromJson();
 
 // 初始化异步分析队列管理器（依赖 uploadDir 与 loadTemplates）
 const analyzeQueueManager = initAnalyzeQueue({ uploadDir, loadTemplates });
-
-// ==================== AI 调用 ====================
-
-async function callSparkAI(messages, model = null, options = {}) {
-  const timeoutMs = options.timeoutMs || 15000;
-  const retries = options.retries !== undefined ? options.retries : 2;
-  const url = `${DMX_CONFIG.baseUrl}/chat/completions`;
-  const headers = {
-    'Accept': 'application/json',
-    'Authorization': DMX_CONFIG.apiKey ? `Bearer ${DMX_CONFIG.apiKey}` : '',
-    'Content-Type': 'application/json'
-  };
-  const useModel = model || currentTextModel || DMX_CONFIG.model;
-  const payload = { model: useModel, messages };
-  console.log('AI Request - Model:', useModel, 'URL:', url);
-
-  for (let attempt = 0; attempt <= retries; attempt++) {
-    try {
-      const response = await axios.post(url, payload, { headers, timeout: timeoutMs });
-      console.log('AI Response status:', response.status);
-      return response.data;
-    } catch (error) {
-      const isLast = attempt === retries;
-      console.error(`AI 调用失败（尝试 ${attempt + 1}/${retries + 1}）:`, error.response?.data || error.message);
-      if (isLast) {
-        throw error;
-      }
-      const backoff = Math.pow(2, attempt) * 1000;
-      await new Promise(r => setTimeout(r, backoff));
-    }
-  }
-}
-
-async function callQwenOmniImageToText(imageDataUrl, textPrompt, model = null) {
-  const url = OMNI_CONFIG.chatUrl;
-  const useModel = model || currentVisionModel || OMNI_CONFIG.model;
-  const headers = {
-    'Content-Type': 'application/json',
-    'Authorization': OMNI_CONFIG.apiKey
-  };
-  const payload = {
-    model: useModel,
-    messages: [{
-      role: 'user',
-      content: [
-        { type: 'image_url', image_url: { url: imageDataUrl } },
-        { type: 'text', text: textPrompt }
-      ]
-    }],
-    stream: true
-  };
-
-  console.log('Vision AI 请求:', url, 'model:', useModel);
-  let response;
-  try {
-    response = await axios.post(url, payload, {
-      headers,
-      responseType: 'stream',
-      timeout: 60000
-    });
-  } catch (err) {
-    // 尝试读取错误响应体
-    if (err.response && err.response.data) {
-      const errorData = [];
-      await new Promise((resolve) => {
-        err.response.data.on('data', chunk => errorData.push(chunk));
-        err.response.data.on('end', resolve);
-      });
-      const errorText = Buffer.concat(errorData).toString();
-      console.error('Doubao Vision 错误响应:', errorText);
-      throw new Error(`API 错误: ${errorText}`);
-    }
-    throw err;
-  }
-
-  if (response.status !== 200) {
-    throw new Error(`Doubao Vision HTTP ${response.status}: ${response.statusText}`);
-  }
-
-  return new Promise((resolve, reject) => {
-    let fullText = '';
-    let buffer = '';
-    response.data.on('data', (chunk) => {
-      buffer += chunk.toString();
-      const lines = buffer.split(/\r?\n/);
-      buffer = lines.pop() || '';
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (trimmed.startsWith('data: ')) {
-          const dataStr = trimmed.slice(6).trim();
-          if (dataStr === '[DONE]') continue;
-          try {
-            const data = JSON.parse(dataStr);
-            const delta = data.choices?.[0]?.delta?.content;
-            if (delta) fullText += delta;
-          } catch (_) {}
-        }
-      }
-    });
-    response.data.on('end', () => {
-      if (buffer.trim().startsWith('data: ')) {
-        try {
-          const data = JSON.parse(buffer.trim().slice(6));
-          const delta = data.choices?.[0]?.delta?.content;
-          if (delta) fullText += delta;
-        } catch (_) {}
-      }
-      resolve(fullText.trim() || '抱歉，分析失败');
-    });
-    response.data.on('error', reject);
-  });
-}
 
 // ==================== 诗词风格 ====================
 
