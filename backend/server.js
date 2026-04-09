@@ -17,13 +17,33 @@ const PORT = process.env.PORT || 3001;
 
 // 安全中间件
 app.use(helmet({
-  contentSecurityPolicy: false, // 允许内联样式
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:", "blob:"],
+      connectSrc: ["'self'", "https://www.dmxapi.cn", "https://ark.cn-beijing.volces.com"],
+      fontSrc: ["'self'"],
+      objectSrc: ["'none'"],
+      upgradeInsecureRequests: []
+    }
+  },
   crossOriginEmbedderPolicy: false
 }));
 app.use(compression()); // 响应压缩
 
 // 中间件
-app.use(cors());
+// CORS 配置：生产环境限制源，开发环境宽松
+const corsOptions = {
+  origin: process.env.NODE_ENV === 'production'
+    ? (process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',') : ['https://moyun.example.com'])
+    : true, // 开发环境允许所有源
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+};
+app.use(cors(corsOptions));
 app.use(express.json({ limit: '1mb' })); // 限制请求体大小
 app.use('/uploads', express.static('uploads'));
 const uploadLimiter = rateLimit({

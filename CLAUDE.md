@@ -71,7 +71,7 @@ Defined in `STYLE_PROMPTS` object in server.js: 五言绝句, 七言绝句, 五�
 ## Deployment
 
 Both services have Dockerfiles:
-- Backend: `backend/Dockerfile` - node:18-alpine, exposes port 3001
+- Backend: `backend/Dockerfile` - node:22-alpine, exposes port 3001
 - Frontend: `frontend/Dockerfile` - Multi-stage build, nginx:alpine, exposes port 80
 
 ## Environment Variables
