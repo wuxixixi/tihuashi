@@ -26,10 +26,14 @@ export function ToastProvider({ children }) {
   return (
     <ToastContext.Provider value={toast}>
       {children}
-      <div className="toast-container">
+      <div className="toast-container" role="region" aria-live="polite" aria-label="通知">
         {toasts.map(t => (
-          <div key={t.id} className={`toast toast-${t.type} ${t.leaving ? 'toast-leave' : 'toast-enter'}`}>
-            <span className="toast-icon">
+          <div 
+            key={t.id} 
+            className={`toast toast-${t.type} ${t.leaving ? 'toast-leave' : 'toast-enter'}`}
+            role="status"
+          >
+            <span className="toast-icon" aria-hidden="true">
               {t.type === 'success' && '\u2714'}
               {t.type === 'error' && '\u2716'}
               {t.type === 'warning' && '\u26A0'}

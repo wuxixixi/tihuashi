@@ -9,13 +9,7 @@ import GalleryPanel from './components/GalleryPanel'
 import SettingsPanel from './components/SettingsPanel'
 import EmptyState from './components/EmptyState'
 import ThemeSwitcher from './components/ThemeSwitcher'
-import useKeyboardShortcuts from './hooks/useKeyboardShortcuts'
-<<<<<<< Updated upstream
-
-const API_BASE = ''
-=======
 import API_BASE from './config'
->>>>>>> Stashed changes
 
 // 草稿键名
 const DRAFT_KEY = 'moyun-draft'
@@ -148,12 +142,6 @@ function App() {
       loadMessages()
     }
   }, [activeTab, loadMessages])
-
-  useKeyboardShortcuts({
-    hasModal: false,
-    onCloseModal: null,
-    onGenerate: null
-  })
 
   return (
     <div className="app">
