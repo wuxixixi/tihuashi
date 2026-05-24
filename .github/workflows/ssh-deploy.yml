@@ -1,0 +1,66 @@
+name: SSH Deploy to Tencent Server
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Build frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: |
+          npm ci
+
+      - name: Deploy to server via SSH
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SSH_PORT }}
+          script: |
+            set -e
+            DEPLOY_DIR="${{ secrets.DEPLOY_DIR }}"
+            mkdir -p "$DEPLOY_DIR"
+            if [ ! -d "$DEPLOY_DIR/.git" ]; then
+              git clone https://github.com/wuxixixi/tihuashi.git "$DEPLOY_DIR"
+            fi
+            cd "$DEPLOY_DIR"
+            git fetch --all --prune
+            git checkout -B main
+            git reset --hard ${{ github.sha }}
+            if [ -f docker-compose.yml ]; then
+              docker-compose down || true
+              docker-compose pull || true
+              docker-compose up -d --build
+            else
+              if ! command -v pm2 >/dev/null 2>&1; then
+                npm install -g pm2 || true
+              fi
+              cd backend
+              npm ci
+              pm2 restart tihuashi || pm2 start server.js --name tihuashi
+            fi

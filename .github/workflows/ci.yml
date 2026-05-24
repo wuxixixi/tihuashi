@@ -1,0 +1,33 @@
+name: CI
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [18]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+      - name: Install backend deps
+        working-directory: backend
+        run: npm install
+      - name: Run npm audit
+        working-directory: backend
+        run: npm audit --audit-level=moderate || true
+      - name: Run backend tests
+        working-directory: backend
+        run: npm test
+      - name: Install frontend deps
+        working-directory: frontend
+        run: npm install
+      - name: Run frontend tests
+        working-directory: frontend
+        run: npm test

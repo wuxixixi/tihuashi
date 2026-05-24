@@ -140,3 +140,23 @@ docker-compose config
 
 ### API 调用失败
 检查 `.env` 文件中的 `DMX_API_KEY` 是否正确配置。
+
+## 生产部署注意
+
+- 队列与异步任务：若要在生产环境使用持久化队列，请配置 REDIS_URL（示例：REDIS_URL=redis://:password@redis-host:6379/0），并在 docker-compose 或环境中提供 Redis 服务。项目已支持内存队列回退，建议生产使用 Redis + BullMQ 以提升可靠性。
+
+- 构建产物管理：仓库不应跟踪 frontend/dist（构建产物）。已在 .gitignore 中列出 frontend/dist。合并到主分支前请在本地或 CI 中移除仓库中的构建产物：
+
+  git rm -r --cached frontend/dist
+  git add .gitignore
+  git commit -m "Remove frontend/dist from repo; move build to CI" -m "Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>"
+
+  在 CI 中添加前端构建步骤：npm ci && npm run build（在发布时生成 frontend/dist）。
+
+- 机密管理：切勿将 API Key 写入镜像或提交到仓库。使用 CI/CD 平台的 Secrets 功能管理敏感信息（例如 GitHub Actions Secrets）。
+
+- 基线负载测试：项目 scripts/ 下提供了负载测试示例（Windows: scripts\run_baseline_load_test.bat，Linux: scripts/autocannon_cmds.txt）。请在隔离的测试环境（staging）运行，并将生成的报告保存在 scripts/reports/ 目录以便分析。
+
+- 安全扫描：建议在合并前启用 secrets scan（已在 .github/workflows/secret-scan.yml 中添加）和依赖审计（npm audit / Dependabot）。
+
+

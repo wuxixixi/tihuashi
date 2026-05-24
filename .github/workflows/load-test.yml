@@ -1,0 +1,33 @@
+name: Load Test
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 3 * * 1' # every Monday 03:00 UTC
+jobs:
+  load-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+      - name: Install backend deps
+        working-directory: backend
+        run: npm ci
+      - name: Start backend
+        working-directory: backend
+        run: nohup npm start &
+      - name: Wait for server
+        run: |
+          for i in {1..30}; do
+            if nc -z localhost 3001; then echo 'server up' && break; fi
+            sleep 1
+          done
+      - name: Run autocannon
+        run: npx autocannon -c 10 -d 20 -m POST -H "Content-Type: application/json" -b '{"imagePath":"/home/runner/work/tihuashi/tihuashi/backend/uploads/sample.jpg"}' http://localhost:3001/api/analyze | tee load_test_output.txt
+      - name: Upload report
+        uses: actions/upload-artifact@v4
+        with:
+          name: load-test-report
+          path: load_test_output.txt

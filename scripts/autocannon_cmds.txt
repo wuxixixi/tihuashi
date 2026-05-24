@@ -1,0 +1,17 @@
+Linux/macOS autocannon examples:
+
+# Simple baseline (50 concurrent clients, 30s duration)
+npx autocannon -c 50 -d 30 -p 10 http://localhost:3001/api/analyze > scripts/reports/autocannon-basic.txt
+
+# JSON output for CI
+npx autocannon -c 50 -d 30 -p 10 -j http://localhost:3001/api/analyze > scripts/reports/autocannon-report.json
+
+# Run with 100 clients to stress test (use with caution)
+npx autocannon -c 100 -d 60 -p 10 http://localhost:3001/api/analyze > scripts/reports/autocannon-heavy.txt
+
+# Autocannon with piped artillery-like report
+npx autocannon -c 50 -d 30 -p 10 http://localhost:3001/api/analyze | tee scripts/reports/autocannon-console.txt
+
+# Notes:
+# - Run load tests in an isolated environment (staging) and not against production endpoints.
+# - Adjust concurrency (-c) and duration (-d) according to your environment capacity.

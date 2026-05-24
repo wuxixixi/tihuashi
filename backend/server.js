@@ -7,52 +7,42 @@ const { v4: uuidv4 } = require('uuid');
 const path = require('path');
 const fs = require('fs');
 const Database = require('better-sqlite3');
+const rateLimit = require('express-rate-limit');
+const imageType = require('image-type');
+const helmet = require('helmet');
+const compression = require('compression');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// 安全中间件
+app.use(helmet({
+  contentSecurityPolicy: false, // 允许内联样式
+  crossOriginEmbedderPolicy: false
+}));
+app.use(compression()); // 响应压缩
+
 // 中间件
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '1mb' })); // 限制请求体大小
 app.use('/uploads', express.static('uploads'));
+const uploadLimiter = rateLimit({
+  windowMs: parseInt(process.env.UPLOAD_RATE_LIMIT_WINDOW_MS || '60000', 10),
+  max: parseInt(process.env.UPLOAD_RATE_LIMIT_MAX || '10', 10),
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, error: '上传请求过多，请稍后再试' }
+});
 
 // ==================== 性能优化 ====================
 
-// 内存缓存（用于 AI 分析结果）
-const analysisCache = new Map();
-const CACHE_TTL = 1000 * 60 * 30; // 30 分钟缓存
+// 使用模块化实现：cache, aiClient, analyzeQueue
+const { getCache, setCache, generateCacheKey } = require('./cache');
+const { callSparkAI, callQwenOmniImageToText } = require('./aiClient');
+const { initAnalyzeQueue } = require('./analyzeQueue');
 
-// 获取缓存
-function getCache(key) {
-  const item = analysisCache.get(key);
-  if (!item) return null;
-  if (Date.now() - item.timestamp > CACHE_TTL) {
-    analysisCache.delete(key);
-    return null;
-  }
-  return item.data;
-}
-
-// 设置缓存
-function setCache(key, data) {
-  analysisCache.set(key, { data, timestamp: Date.now() });
-}
-
-// 生成缓存 key（基于图片文件内容）
-function generateCacheKey(imagePath) {
-  const stats = fs.statSync(imagePath);
-  return `${imagePath}-${stats.size}-${stats.mtime.getTime()}`;
-}
-
-// 定期清理过期缓存
-setInterval(() => {
-  const now = Date.now();
-  for (const [key, item] of analysisCache) {
-    if (now - item.timestamp > CACHE_TTL) {
-      analysisCache.delete(key);
-    }
-  }
-}, 1000 * 60 * 10); // 每 10 分钟清理一次
+// 缓存配置（由 backend/cache.js 管理）
+const CACHE_TTL = parseInt(process.env.CACHE_TTL_MS || String(1000 * 60 * 30), 10); // 默认 30 分钟
 
 // 确保上传目录存在
 const uploadDir = path.join(__dirname, 'uploads');
@@ -429,12 +419,56 @@ db.exec(`
     thumbnailUrl TEXT,
     status TEXT DEFAULT 'pending',
     provider TEXT DEFAULT 'kling',
+    model TEXT,
+    style TEXT DEFAULT 'natural',
+    duration INTEGER DEFAULT 5,
+    resolution TEXT DEFAULT '720p',
     cost REAL DEFAULT 0,
     errorMessage TEXT,
+    taskId TEXT,
+    shareId TEXT,
+    shareExpiresAt TEXT,
+    favorite INTEGER DEFAULT 0,
     createdAt TEXT,
     FOREIGN KEY (historyId) REFERENCES history(id)
-  )
+  );
+
+  -- 迁移：添加新字段（如果不存在）
+  PRAGMA table_info(animations);
 `);
+
+// 动画表迁移：添加新字段
+try {
+  const columns = db.prepare('PRAGMA table_info(animations)').all();
+  const columnNames = columns.map(c => c.name);
+
+  if (!columnNames.includes('model')) {
+    db.prepare('ALTER TABLE animations ADD COLUMN model TEXT').run();
+  }
+  if (!columnNames.includes('style')) {
+    db.prepare('ALTER TABLE animations ADD COLUMN style TEXT DEFAULT \'natural\'').run();
+  }
+  if (!columnNames.includes('duration')) {
+    db.prepare('ALTER TABLE animations ADD COLUMN duration INTEGER DEFAULT 5').run();
+  }
+  if (!columnNames.includes('resolution')) {
+    db.prepare('ALTER TABLE animations ADD COLUMN resolution TEXT DEFAULT \'720p\'').run();
+  }
+  if (!columnNames.includes('taskId')) {
+    db.prepare('ALTER TABLE animations ADD COLUMN taskId TEXT').run();
+  }
+  if (!columnNames.includes('shareId')) {
+    db.prepare('ALTER TABLE animations ADD COLUMN shareId TEXT').run();
+  }
+  if (!columnNames.includes('shareExpiresAt')) {
+    db.prepare('ALTER TABLE animations ADD COLUMN shareExpiresAt TEXT').run();
+  }
+  if (!columnNames.includes('favorite')) {
+    db.prepare('ALTER TABLE animations ADD COLUMN favorite INTEGER DEFAULT 0').run();
+  }
+} catch (e) {
+  console.log('动画表迁移警告:', e.message);
+}
 
 // 从旧 history.json 迁移数据（仅一次）
 function migrateFromJson() {
@@ -462,107 +496,8 @@ function migrateFromJson() {
 }
 migrateFromJson();
 
-// ==================== AI 调用 ====================
-
-async function callSparkAI(messages, model = null) {
-  try {
-    const url = `${DMX_CONFIG.baseUrl}/chat/completions`;
-    const headers = {
-      'Accept': 'application/json',
-      'Authorization': DMX_CONFIG.apiKey,
-      'Content-Type': 'application/json'
-    };
-    const useModel = model || currentTextModel || DMX_CONFIG.model;
-    const payload = { model: useModel, messages };
-    console.log('AI Request - Model:', useModel, 'URL:', url);
-    const response = await axios.post(url, payload, { headers });
-    console.log('AI Response:', response.data?.choices?.[0]?.message ? 'OK' : response.data);
-    return response.data;
-  } catch (error) {
-    console.error('AI 调用失败:', error.response?.data || error.message);
-    throw error;
-  }
-}
-
-async function callQwenOmniImageToText(imageDataUrl, textPrompt, model = null) {
-  const url = OMNI_CONFIG.chatUrl;
-  const useModel = model || currentVisionModel || OMNI_CONFIG.model;
-  const headers = {
-    'Content-Type': 'application/json',
-    'Authorization': OMNI_CONFIG.apiKey
-  };
-  const payload = {
-    model: useModel,
-    messages: [{
-      role: 'user',
-      content: [
-        { type: 'image_url', image_url: { url: imageDataUrl } },
-        { type: 'text', text: textPrompt }
-      ]
-    }],
-    stream: true
-  };
-
-  console.log('Vision AI 请求:', url, 'model:', useModel);
-  let response;
-  try {
-    response = await axios.post(url, payload, {
-      headers,
-      responseType: 'stream',
-      timeout: 60000
-    });
-  } catch (err) {
-    // 尝试读取错误响应体
-    if (err.response && err.response.data) {
-      const errorData = [];
-      await new Promise((resolve) => {
-        err.response.data.on('data', chunk => errorData.push(chunk));
-        err.response.data.on('end', resolve);
-      });
-      const errorText = Buffer.concat(errorData).toString();
-      console.error('Doubao Vision 错误响应:', errorText);
-      throw new Error(`API 错误: ${errorText}`);
-    }
-    throw err;
-  }
-
-  if (response.status !== 200) {
-    throw new Error(`Doubao Vision HTTP ${response.status}: ${response.statusText}`);
-  }
-
-  return new Promise((resolve, reject) => {
-    let fullText = '';
-    let buffer = '';
-    response.data.on('data', (chunk) => {
-      buffer += chunk.toString();
-      const lines = buffer.split(/\r?\n/);
-      buffer = lines.pop() || '';
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (trimmed.startsWith('data: ')) {
-          const dataStr = trimmed.slice(6).trim();
-          if (dataStr === '[DONE]') continue;
-          try {
-            const data = JSON.parse(dataStr);
-            const delta = data.choices?.[0]?.delta?.content;
-            if (delta) fullText += delta;
-          } catch (_) {}
-        }
-      }
-    });
-    response.data.on('end', () => {
-      if (buffer.trim().startsWith('data: ')) {
-        try {
-          const data = JSON.parse(buffer.trim().slice(6));
-          const delta = data.choices?.[0]?.delta?.content;
-          if (delta) fullText += delta;
-        } catch (_) {}
-      }
-      resolve(fullText.trim() || '抱歉，分析失败');
-    });
-    response.data.on('error', reject);
-  });
-}
+// 初始化异步分析队列管理器（依赖 uploadDir 与 loadTemplates）
+const analyzeQueueManager = initAnalyzeQueue({ uploadDir, loadTemplates });
 
 // ==================== 诗词风格 ====================
 
@@ -606,7 +541,7 @@ function parseTitleAndPoem(raw) {
 // ==================== API 路由 ====================
 
 // 1. 上传图片（支持压缩）
-app.post('/api/upload', upload.single('image'), async (req, res) => {
+app.post('/api/upload', uploadLimiter, upload.single('image'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: '请上传图片' });
 
   const originalPath = req.file.path;
@@ -615,6 +550,15 @@ app.post('/api/upload', upload.single('image'), async (req, res) => {
   const compressedPath = path.join(compressedDir, compressedFilename);
 
   try {
+    // 内容检测：基于文件头判断真实类型，防止伪装
+    const fileBuffer = fs.readFileSync(originalPath);
+    const detected = imageType(fileBuffer);
+    const allowedExts = ['jpg','jpeg','png','webp'];
+    if (!detected || !allowedExts.includes(detected.ext)) {
+      try { fs.unlinkSync(originalPath); } catch (_) {}
+      return res.status(400).json({ success: false, error: '仅支持 jpeg/jpg/png/webp 图片' });
+    }
+
     // 尝试压缩图片
     await compressImage(originalPath, compressedPath, 1200, 0.8);
 
@@ -636,6 +580,9 @@ app.post('/api/upload', upload.single('image'), async (req, res) => {
       fs.unlinkSync(compressedPath);
     }
 
+    // 尝试设置严格文件权限（Unix）
+    try { fs.chmodSync(finalPath, 0o600); } catch (_) {}
+
     res.json({
       success: true,
       url: finalUrl,
@@ -645,14 +592,11 @@ app.post('/api/upload', upload.single('image'), async (req, res) => {
       compressedSize: compressedSize < originalSize * 0.9 ? compressedSize : originalSize
     });
   } catch (err) {
-    // 压缩失败，使用原文件
-    console.error('图片压缩失败:', err.message);
-    res.json({
-      success: true,
-      url: `/uploads/${filename}`,
-      filename,
-      fullPath: originalPath
-    });
+    // 处理失败，清理文件
+    console.error('图片处理失败:', err.message || err);
+    try { fs.unlinkSync(compressedPath); } catch (_) {}
+    try { fs.unlinkSync(originalPath); } catch (_) {}
+    res.status(500).json({ success: false, error: '图片处理失败' });
   }
 });
 
@@ -663,19 +607,7 @@ app.post('/api/analyze', async (req, res) => {
     if (!imagePath || typeof imagePath !== 'string') {
       return res.status(400).json({ success: false, error: '图片路径无效' });
     }
-<<<<<<< Updated upstream
-
-    // 检查缓存
-    const cacheKey = generateCacheKey(imagePath);
-    const cached = getCache(cacheKey);
-    if (cached) {
-      console.log('使用缓存的分析结果');
-      return res.json({ success: true, ...cached, fromCache: true });
-    }
-
-    const imageBuffer = fs.readFileSync(imagePath);
-=======
-    // 安全检查：防止路径遍历攻击
+    // 安全检查：防止路径遍历攻击并确保文件存在
     const resolvedPath = path.resolve(imagePath);
     if (!resolvedPath.startsWith(uploadDir)) {
       return res.status(400).json({ success: false, error: '图片路径无效' });
@@ -683,8 +615,16 @@ app.post('/api/analyze', async (req, res) => {
     if (!fs.existsSync(resolvedPath)) {
       return res.status(400).json({ success: false, error: '图片不存在' });
     }
+
+    // 检查缓存（基于文件元数据）
+    const cacheKey = generateCacheKey(resolvedPath);
+    const cached = getCache(cacheKey);
+    if (cached) {
+      console.log('使用缓存的分析结果');
+      return res.json({ success: true, ...cached, fromCache: true });
+    }
+
     const imageBuffer = fs.readFileSync(resolvedPath);
->>>>>>> Stashed changes
     const base64 = imageBuffer.toString('base64');
     const ext = path.extname(resolvedPath).toLowerCase();
     const mime = ext === '.png' ? 'image/png' : ext === '.webp' ? 'image/webp' : 'image/jpeg';
@@ -715,6 +655,34 @@ app.post('/api/analyze', async (req, res) => {
     console.error('分析API错误:', error);
     res.status(500).json({ success: false, error: error.message });
   }
+});
+
+// 异步分析队列接口（短期内提供）
+// POST /api/analyze/queue -> { jobId }
+app.post('/api/analyze/queue', (req, res) => {
+  try {
+    const { imagePath } = req.body;
+    if (!imagePath || typeof imagePath !== 'string') {
+      return res.status(400).json({ success: false, error: '图片路径无效' });
+    }
+    // 如果是在测试环境，仍然建议使用同步接口以保持兼容性
+    if (process.env.NODE_ENV === 'test') {
+      return res.status(400).json({ success: false, error: '异步队列在测试环境不可用' });
+    }
+    const jobId = analyzeQueueManager.enqueueAnalyze(imagePath);
+    res.json({ success: true, jobId });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// GET /api/analyze/result?jobId=...
+app.get('/api/analyze/result', (req, res) => {
+  const { jobId } = req.query;
+  if (!jobId) return res.status(400).json({ success: false, error: 'jobId required' });
+  const job = analyzeQueueManager.getJob(jobId);
+  if (!job) return res.status(404).json({ success: false, error: 'job not found' });
+  res.json({ success: true, jobId, ...job });
 });
 
 // 3. 生成诗词
@@ -1897,7 +1865,18 @@ function generateAnimationPrompt(analysis, genre, style = 'natural') {
 // 30. 生成动画
 app.post('/api/animate/generate', async (req, res) => {
   try {
-    const { imageUrl, analysis, genre, historyId, style = 'natural', videoModel = currentVideoModel } = req.body
+    const {
+      imageUrl,
+      analysis,
+      genre,
+      historyId,
+      style = 'natural',
+      videoModel = currentVideoModel,
+      duration = 5,
+      resolution = '720p',
+      customPrompt = null, // 自定义提示词
+      styles = null // 批量生成时传入的多个风格数组
+    } = req.body
 
     if (!imageUrl) {
       return res.status(400).json({ success: false, error: '请提供画作图片' })
@@ -1919,15 +1898,48 @@ app.post('/api/animate/generate', async (req, res) => {
       }
     }
 
+    // 批量生成模式
+    if (styles && Array.isArray(styles) && styles.length > 0) {
+      const results = []
+      for (const s of styles) {
+        const prompt = customPrompt || generateAnimationPrompt(analysis, genre, s)
+        const animationId = uuidv4()
+
+        db.prepare(`
+          INSERT INTO animations (id, historyId, imageUrl, prompt, status, provider, model, style, duration, resolution, cost, createdAt)
+          VALUES (?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?)
+        `).run(animationId, historyId || null, imageUrl, prompt, videoConfig.provider, videoModel, s, duration, resolution, videoConfig.cost, new Date().toISOString())
+
+        results.push({
+          animationId,
+          style: s,
+          prompt,
+          status: 'pending'
+        })
+      }
+
+      // 异步处理所有动画任务（简化版，实际应使用队列）
+      processAnimationBatch(results, imageUrl, videoConfig, videoModel, duration)
+
+      return res.json({
+        success: true,
+        batch: true,
+        count: results.length,
+        animations: results,
+        message: `已提交 ${results.length} 个动画生成任务`
+      })
+    }
+
+    // 单个生成模式
     // 生成动画提示词
-    const prompt = generateAnimationPrompt(analysis, genre, style)
+    const prompt = customPrompt || generateAnimationPrompt(analysis, genre, style)
 
     // 创建动画记录
     const animationId = uuidv4()
     db.prepare(`
-      INSERT INTO animations (id, historyId, imageUrl, prompt, status, provider, cost, createdAt)
-      VALUES (?, ?, ?, ?, 'pending', ?, ?, ?)
-    `).run(animationId, historyId || null, imageUrl, prompt, videoConfig.provider, videoConfig.cost, new Date().toISOString())
+      INSERT INTO animations (id, historyId, imageUrl, prompt, status, provider, model, style, duration, resolution, cost, createdAt)
+      VALUES (?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?)
+    `).run(animationId, historyId || null, imageUrl, prompt, videoConfig.provider, videoModel, style, duration, resolution, videoConfig.cost, new Date().toISOString())
 
     // 获取图片的完整URL
     let fullImageUrl = imageUrl
@@ -1945,86 +1957,26 @@ app.post('/api/animate/generate', async (req, res) => {
 
       // 根据不同的提供商调用不同的 API
       if (videoConfig.provider === 'dmxapi') {
-        // DMXAPI 视频生成
-        // 尝试使用 images/generations 端点（部分视频模型支持）
-        try {
-          const dmxResponse = await axios.post(`${DMX_CONFIG.baseUrl}/images/generations`, {
-            model: videoModel,
-            prompt: prompt || '让图片动起来',
-            image: fullImageUrl,
-            duration: videoConfig.duration || 5,
-            n: 1
-          }, {
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${DMX_CONFIG.apiKey}`
-            },
-            timeout: 180000
-          })
+        // DMXAPI 视频生成 - 使用 /v1/responses 端点
+        // 格式：model + input(任意字符串) + image(图片URL) + prompt + duration
+        const dmxResponse = await axios.post(`${DMX_CONFIG.baseUrl}/responses`, {
+          model: videoModel,
+          input: fullImageUrl,  // input 参数（可以是任意字符串或图片URL）
+          image: fullImageUrl,  // 图片URL
+          prompt: prompt || '让图片动起来',
+          duration: videoConfig.duration || 5
+        }, {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${DMX_CONFIG.apiKey}`
+          },
+          timeout: 60000  // 提交任务不需要太长时间
+        })
 
-          // 检查是否返回了视频 URL
-          const videoUrl = dmxResponse.data?.data?.[0]?.url || dmxResponse.data?.data?.[0]?.video_url
-          if (videoUrl) {
-            db.prepare(`UPDATE animations SET status = 'completed', videoUrl = ? WHERE id = ?`).run(videoUrl, animationId)
-            return res.json({
-              success: true,
-              animationId,
-              prompt,
-              status: 'completed',
-              videoUrl,
-              modelName: videoConfig.name,
-              message: '视频生成完成'
-            })
-          }
-
-          taskId = dmxResponse.data?.id || animationId
-          apiResponse = dmxResponse.data
-
-        } catch (imageError) {
-          // images/generations 失败，尝试 chat/completions
-          console.log('images/generations 失败，尝试 chat/completions...')
-          const dmxResponse = await axios.post(`${DMX_CONFIG.baseUrl}/chat/completions`, {
-            model: videoModel,
-            messages: [
-              {
-                role: 'user',
-                content: [
-                  { type: 'image_url', image_url: { url: fullImageUrl } },
-                  { type: 'text', text: prompt || '让图片动起来，生成一个流畅的动画视频' }
-                ]
-              }
-            ],
-            max_tokens: 100
-          }, {
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${DMX_CONFIG.apiKey}`
-            },
-            timeout: 180000
-          })
-
-          // 解析响应
-          const choice = dmxResponse.data?.choices?.[0]
-          if (choice?.message?.content) {
-            const content = choice.message.content
-            const videoMatch = content.match(/https?:\/\/[^\s"'<>]+\.(mp4|webm|mov)/i)
-            if (videoMatch) {
-              db.prepare(`UPDATE animations SET status = 'completed', videoUrl = ? WHERE id = ?`).run(videoMatch[0], animationId)
-              return res.json({
-                success: true,
-                animationId,
-                prompt,
-                status: 'completed',
-                videoUrl: videoMatch[0],
-                modelName: videoConfig.name,
-                message: '视频生成完成'
-              })
-            }
-          }
-
-          taskId = animationId
-          apiResponse = dmxResponse.data
-        }
+        // 提取 task_id
+        taskId = dmxResponse.data?.data?.task_id
+        apiResponse = dmxResponse.data
+        console.log('DMXAPI 视频任务已提交:', taskId)
 
       } else if (videoConfig.provider === 'kling') {
         // 可灵 API
@@ -2085,11 +2037,16 @@ app.post('/api/animate/generate', async (req, res) => {
         apiResponse = runwayResponse.data
       }
 
-      // 更新记录为处理中
+      // 更新记录为处理中，保存 taskId
       db.prepare(`
-        UPDATE animations SET status = 'processing'
+        UPDATE animations SET status = 'processing', taskId = ?
         WHERE id = ?
-      `).run(animationId)
+      `).run(taskId, animationId)
+
+      // DMXAPI 异步任务需要用户手动查看结果
+      const taskCheckUrl = videoConfig.provider === 'dmxapi'
+        ? 'https://www.dmxapi.cn/task'
+        : null
 
       res.json({
         success: true,
@@ -2099,7 +2056,10 @@ app.post('/api/animate/generate', async (req, res) => {
         status: 'processing',
         provider: videoConfig.provider,
         modelName: videoConfig.name,
-        message: '视频生成任务已提交，请稍后查询状态'
+        taskCheckUrl,
+        message: taskCheckUrl
+          ? '视频生成任务已提交。由于 DMXAPI 视频生成需要较长时间，请点击下方链接查看结果'
+          : '视频生成任务已提交，请稍后查询状态'
       })
 
     } catch (apiError) {
@@ -2291,6 +2251,299 @@ app.post('/api/video-models/switch', (req, res) => {
     res.status(500).json({ success: false, error: error.message })
   }
 })
+
+// ============ 提示词模板 API ============
+
+// 36. 获取提示词模板列表
+app.get('/api/prompt-templates', (req, res) => {
+  try {
+    const templates = db.prepare('SELECT * FROM prompt_templates ORDER BY createdAt DESC').all()
+    res.json({ success: true, templates })
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message })
+  }
+})
+
+// 37. 创建提示词模板
+app.post('/api/prompt-templates', (req, res) => {
+  try {
+    const { name, template } = req.body
+    if (!name || !template) {
+      return res.status(400).json({ success: false, error: '名称和模板内容不能为空' })
+    }
+
+    const id = uuidv4()
+    const now = new Date().toISOString()
+    db.prepare('INSERT INTO prompt_templates (id, name, template, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?)')
+      .run(id, name, template, now, now)
+
+    res.json({ success: true, template: { id, name, template, createdAt: now, updatedAt: now } })
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message })
+  }
+})
+
+// 38. 更新提示词模板
+app.put('/api/prompt-templates/:id', (req, res) => {
+  try {
+    const { id } = req.params
+    const { name, template } = req.body
+
+    if (!name || !template) {
+      return res.status(400).json({ success: false, error: '名称和模板内容不能为空' })
+    }
+
+    const existing = db.prepare('SELECT * FROM prompt_templates WHERE id = ?').get(id)
+    if (!existing) {
+      return res.status(404).json({ success: false, error: '模板不存在' })
+    }
+
+    const now = new Date().toISOString()
+    db.prepare('UPDATE prompt_templates SET name = ?, template = ?, updatedAt = ? WHERE id = ?')
+      .run(name, template, now, id)
+
+    res.json({ success: true, template: { ...existing, name, template, updatedAt: now } })
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message })
+  }
+})
+
+// 39. 删除提示词模板
+app.delete('/api/prompt-templates/:id', (req, res) => {
+  try {
+    db.prepare('DELETE FROM prompt_templates WHERE id = ?').run(req.params.id)
+    res.json({ success: true, message: '模板已删除' })
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message })
+  }
+})
+
+// ============ 动画分享 API ============
+
+// 40. 创建分享链接
+app.post('/api/animate/:id/share', (req, res) => {
+  try {
+    const { id } = req.params
+    const { expiresInDays = 7 } = req.body
+
+    const animation = db.prepare('SELECT * FROM animations WHERE id = ?').get(id)
+    if (!animation) {
+      return res.status(404).json({ success: false, error: '动画不存在' })
+    }
+
+    if (!animation.videoUrl) {
+      return res.status(400).json({ success: false, error: '动画尚未生成完成' })
+    }
+
+    // 生成分享ID
+    const shareId = uuidv4().slice(0, 8)
+    const expiresAt = new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000).toISOString()
+
+    db.prepare('UPDATE animations SET shareId = ?, shareExpiresAt = ? WHERE id = ?')
+      .run(shareId, expiresAt, id)
+
+    const host = req.get('host')
+    const protocol = req.protocol
+    const shareUrl = `${protocol}://${host}/share/${shareId}`
+
+    res.json({
+      success: true,
+      shareId,
+      shareUrl,
+      expiresAt,
+      message: '分享链接已创建'
+    })
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message })
+  }
+})
+
+// 41. 获取分享的动画
+app.get('/api/share/:shareId', (req, res) => {
+  try {
+    const { shareId } = req.params
+
+    const animation = db.prepare(`
+      SELECT a.*, h.title, h.poem, h.analysis
+      FROM animations a
+      LEFT JOIN history h ON a.historyId = h.id
+      WHERE a.shareId = ?
+    `).get(shareId)
+
+    if (!animation) {
+      return res.status(404).json({ success: false, error: '分享链接不存在或已过期' })
+    }
+
+    if (animation.shareExpiresAt && new Date(animation.shareExpiresAt) < new Date()) {
+      return res.status(410).json({ success: false, error: '分享链接已过期' })
+    }
+
+    res.json({
+      success: true,
+      animation: {
+        id: animation.id,
+        imageUrl: animation.imageUrl,
+        videoUrl: animation.videoUrl,
+        prompt: animation.prompt,
+        style: animation.style,
+        title: animation.title,
+        poem: animation.poem,
+        createdAt: animation.createdAt
+      }
+    })
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message })
+  }
+})
+
+// ============ 动画收藏 API ============
+
+// 42. 切换动画收藏状态
+app.post('/api/animate/:id/favorite', (req, res) => {
+  try {
+    const { id } = req.params
+    const animation = db.prepare('SELECT favorite FROM animations WHERE id = ?').get(id)
+
+    if (!animation) {
+      return res.status(404).json({ success: false, error: '动画不存在' })
+    }
+
+    const newFavorite = animation.favorite ? 0 : 1
+    db.prepare('UPDATE animations SET favorite = ? WHERE id = ?').run(newFavorite, id)
+
+    res.json({
+      success: true,
+      favorite: newFavorite,
+      message: newFavorite ? '已添加到收藏' : '已取消收藏'
+    })
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message })
+  }
+})
+
+// 43. 更新动画信息
+app.patch('/api/animate/:id', (req, res) => {
+  try {
+    const { id } = req.params
+    const { videoUrl, thumbnailUrl, status, errorMessage } = req.body
+
+    const animation = db.prepare('SELECT * FROM animations WHERE id = ?').get(id)
+    if (!animation) {
+      return res.status(404).json({ success: false, error: '动画不存在' })
+    }
+
+    const updates = []
+    const values = []
+
+    if (videoUrl !== undefined) {
+      updates.push('videoUrl = ?')
+      values.push(videoUrl)
+    }
+    if (thumbnailUrl !== undefined) {
+      updates.push('thumbnailUrl = ?')
+      values.push(thumbnailUrl)
+    }
+    if (status !== undefined) {
+      updates.push('status = ?')
+      values.push(status)
+    }
+    if (errorMessage !== undefined) {
+      updates.push('errorMessage = ?')
+      values.push(errorMessage)
+    }
+
+    if (updates.length === 0) {
+      return res.status(400).json({ success: false, error: '没有要更新的内容' })
+    }
+
+    values.push(id)
+    db.prepare(`UPDATE animations SET ${updates.join(', ')} WHERE id = ?`).run(...values)
+
+    res.json({ success: true, message: '动画信息已更新' })
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message })
+  }
+})
+
+// 44. 获取动画详情
+app.get('/api/animate/:id', (req, res) => {
+  try {
+    const animation = db.prepare(`
+      SELECT a.*, h.title, h.poem, h.analysis, h.userFeeling
+      FROM animations a
+      LEFT JOIN history h ON a.historyId = h.id
+      WHERE a.id = ?
+    `).get(req.params.id)
+
+    if (!animation) {
+      return res.status(404).json({ success: false, error: '动画不存在' })
+    }
+
+    res.json({ success: true, animation })
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message })
+  }
+})
+
+// ============ 批量处理辅助函数 ============
+
+// 批量处理动画任务
+async function processAnimationBatch(animations, imageUrl, videoConfig, videoModel, duration) {
+  const host = process.env.HOST || 'localhost:3001'
+  const protocol = process.env.PROTOCOL || 'http'
+  let fullImageUrl = imageUrl
+  if (!imageUrl.startsWith('http')) {
+    fullImageUrl = `${protocol}://${host}${imageUrl}`
+  }
+
+  for (const anim of animations) {
+    try {
+      let taskId = null
+
+      if (videoConfig.provider === 'dmxapi') {
+        const dmxResponse = await axios.post(`${DMX_CONFIG.baseUrl}/responses`, {
+          model: videoModel,
+          input: fullImageUrl,
+          image: fullImageUrl,
+          prompt: anim.prompt,
+          duration: duration
+        }, {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${DMX_CONFIG.apiKey}`
+          },
+          timeout: 60000
+        })
+        taskId = dmxResponse.data?.data?.task_id
+      } else if (videoConfig.provider === 'kling') {
+        const klingApiKey = process.env.KLING_API_KEY || DMX_CONFIG.apiKey
+        const klingResponse = await axios.post(videoConfig.apiUrl, {
+          model: videoModel,
+          image_url: fullImageUrl,
+          prompt: anim.prompt,
+          duration: duration,
+          cfg_scale: 0.5,
+          mode: videoModel.includes('pro') ? 'pro' : 'std'
+        }, {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${klingApiKey}`
+          },
+          timeout: 30000
+        })
+        taskId = klingResponse.data?.data?.task_id
+      }
+
+      db.prepare('UPDATE animations SET status = \'processing\', taskId = ? WHERE id = ?')
+        .run(taskId, anim.animationId)
+
+    } catch (error) {
+      console.error(`批量动画任务失败 [${anim.animationId}]:`, error.message)
+      db.prepare('UPDATE animations SET status = \'failed\', errorMessage = ? WHERE id = ?')
+        .run(error.message, anim.animationId)
+    }
+  }
+}
 
 // 初始化时加载用户设置
 function loadUserSettings() {

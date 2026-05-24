@@ -105,4 +105,10 @@ MIT License
 **上海觉测信息科技有限公司**
 
 专注人工智能与文化科技的融合创新
-\n<!-- Test deploy Fri Mar 20 12:21:26 CST 2026 -->
+\n## 部署与运行注意事项
+
+- 不要将 frontend/dist 提交到版本库。构建产物应由 CI/发布流程生成。已在 .gitignore 中添加 frontend/dist。
+- 若在生产使用 Redis 作为队列后端，请在生产环境添加 REDIS_URL 配置，并在 docker-compose 或托管服务中提供 Redis。
+- 项目包含负载测试脚本（scripts/run_baseline_load_test.bat、scripts/autocannon_cmds.txt），请在隔离环境中运行负载测试并保存报告到 scripts/reports/。
+
+<!-- Test deploy Fri Mar 20 12:21:26 CST 2026 -->

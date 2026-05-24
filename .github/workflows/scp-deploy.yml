@@ -1,0 +1,90 @@
+name: SCP Deploy to Tencent Server
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build-and-transfer:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Build frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+
+      - name: Prepare deploy package
+        run: |
+          set -e
+          rm -rf deploy_package
+          mkdir -p deploy_package
+          # copy backend source and docker-compose
+          cp -r backend deploy_package/backend || true
+          cp docker-compose.yml deploy_package/ || true
+          cp server_deploy.sh deploy_package/ || true
+          # include built frontend
+          mkdir -p deploy_package/frontend_dist
+          cp -r frontend/dist/* deploy_package/frontend_dist/ || true
+          ls -al deploy_package
+
+      - name: Copy package to server (SCP)
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SSH_PORT }}
+          source: "deploy_package/*"
+          target: "${{ secrets.DEPLOY_DIR }}/incoming_${{ github.run_id }}"
+
+      - name: Deploy on server (SSH)
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SSH_PORT }}
+          script: |
+            set -e
+            INCOMING="${{ secrets.DEPLOY_DIR }}/incoming_${{ github.run_id }}"
+            DEPLOY_DIR="${{ secrets.DEPLOY_DIR }}"
+            mkdir -p "$DEPLOY_DIR"
+            # move incoming to deploy dir (atomically)
+            rsync -a --delete "$INCOMING/" "$DEPLOY_DIR/" || cp -r "$INCOMING/"* "$DEPLOY_DIR/" || true
+
+            # If docker-compose exists, use it
+            if [ -f "$DEPLOY_DIR/docker-compose.yml" ]; then
+              cd "$DEPLOY_DIR"
+              docker compose down || true
+              docker compose pull || true
+              docker compose up -d --build || true
+            else
+              # Fallback: start backend with pm2
+              if [ -d "$DEPLOY_DIR/backend" ]; then
+                cd "$DEPLOY_DIR/backend"
+                npm ci || true
+                if ! command -v pm2 >/dev/null 2>&1; then
+                  npm install -g pm2 || true
+                fi
+                pm2 restart tihuashi || pm2 start server.js --name tihuashi || true
+              fi
+            fi
+
+            echo "Deploy finished."

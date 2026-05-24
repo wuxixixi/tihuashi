@@ -16,16 +16,13 @@ services:
       - DMX_MODEL=${DMX_MODEL:-gpt-5-mini}
       - VISION_MODEL=${VISION_MODEL:-Doubao-1.5-vision-pro-32k}
       - PORT=3001
-<<<<<<< Updated upstream
       - DB_PATH=/app/data/moyun.db
-=======
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:3001/api/history?page=1&pageSize=1"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 10s
->>>>>>> Stashed changes
 
   frontend:
     build: ./frontend
