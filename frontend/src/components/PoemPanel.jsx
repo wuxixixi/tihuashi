@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import API_BASE from '../config'
 
 const poemStyles = {
@@ -52,7 +52,7 @@ export default function PoemPanel({ analysis, feeling, image, setLoadingStage, t
   const [speaking, setSpeaking] = useState(false)
   const [speechRate, setSpeechRate] = useState(0.85)
 
-  const generatePoem = async () => {
+  const generatePoem = useCallback(async () => {
     if (!analysis) {
       toast.warning('请先上传图片并等待AI赏析完成')
       return
@@ -83,7 +83,7 @@ export default function PoemPanel({ analysis, feeling, image, setLoadingStage, t
     }
     setPoemLoading(false)
     setLoadingStage(null)
-  }
+  }, [analysis, feeling, style, useCustom, customStyle, toast, setLoadingStage, onSaveRecord])
 
   const startEdit = () => {
     setEditPoem(poem)
@@ -91,6 +91,34 @@ export default function PoemPanel({ analysis, feeling, image, setLoadingStage, t
     setPolishSuggestion('')
     setIsEditing(true)
   }
+
+  const closeAllModals = useCallback(() => {
+    setShowRewriteModal(false)
+    setShowAnalyzeModal(false)
+    setShowCalligraphyModal(false)
+    setIsEditing(false)
+  }, [])
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.key === 'Escape') {
+        if (showRewriteModal || showAnalyzeModal || showCalligraphyModal || isEditing) {
+          e.preventDefault()
+          closeAllModals()
+        }
+        return
+      }
+      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+        if (analysis && !poemLoading) {
+          e.preventDefault()
+          generatePoem()
+        }
+        return
+      }
+    }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  }, [analysis, poemLoading, showRewriteModal, showAnalyzeModal, showCalligraphyModal, isEditing, closeAllModals, generatePoem])
 
   const saveEdit = () => {
     setPoem(editPoem)

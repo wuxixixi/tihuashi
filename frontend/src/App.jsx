@@ -9,7 +9,6 @@ import GalleryPanel from './components/GalleryPanel'
 import SettingsPanel from './components/SettingsPanel'
 import EmptyState from './components/EmptyState'
 import ThemeSwitcher from './components/ThemeSwitcher'
-import useKeyboardShortcuts from './hooks/useKeyboardShortcuts'
 import API_BASE from './config'
 
 // 草稿键名
@@ -143,12 +142,6 @@ function App() {
       loadMessages()
     }
   }, [activeTab, loadMessages])
-
-  useKeyboardShortcuts({
-    hasModal: false,
-    onCloseModal: null,
-    onGenerate: null
-  })
 
   return (
     <div className="app">

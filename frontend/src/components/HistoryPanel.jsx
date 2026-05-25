@@ -85,6 +85,25 @@ export default function HistoryPanel({ toast, confirm }) {
     }
   }, [showStats])
 
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.key === 'Escape') {
+        if (showRewriteModal) {
+          e.preventDefault()
+          setShowRewriteModal(false)
+        } else if (showAnalyzeModal) {
+          e.preventDefault()
+          setShowAnalyzeModal(false)
+        } else if (selectedHistory) {
+          e.preventDefault()
+          setSelectedHistory(null)
+        }
+      }
+    }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  }, [showRewriteModal, showAnalyzeModal, selectedHistory])
+
   const deleteHistory = async (id) => {
     const ok = await confirm('确定要删除这条记录吗？删除后不可恢复。', '删除确认')
     if (!ok) return
