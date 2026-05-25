@@ -30,7 +30,11 @@
       "Bash(pip install:*)",
       "Bash(timeout:*)",
       "Bash(ssh:*)",
-      "Bash(chmod:*)"
+      "Bash(chmod:*)",
+      "Bash(env)",
+      "Skill(update-config)",
+      "Bash(npm install:*)",
+      "Bash(npm test:*)"
     ]
   }
 }
